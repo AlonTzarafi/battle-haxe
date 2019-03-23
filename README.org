@@ -1,0 +1,72 @@
+* battle-haxe
+
+A development system for the Haxe programming language inside Emacs.
+
+[[file:battle-haxe.png]]
+
+Provides code-completion and IDE-like features when editing Haxe code, provided by the Haxe compiler's [[https://haxe.org/manual/cr-completion-overview.html]["compiler services"]] in server mode.
+
+Defaults to a very basic js-mode for syntax highlighting that does the job.
+
+See [[*Installation]] section to get started.
+
+The main quirk is that the system has to force automatic saving of the edited Haxe buffer. ( [[*Big issue]] )
+
+* Features
+- Member completion (via [[https://github.com/company-mode/company-mode][company-mode]]), for example after "myObject." or "override "
+- Type completion, for example after "new " or "import "
+- If you auto-complete a class name for example after "new " it will automatically import the class as well
+- Jump to definition of current symbol with a key. Press another key to go back to where you were
+- Find all references (using [[https://github.com/emacs-helm/helm][helm]]) of the current symbol
+- Eldoc support
+
+* Big issue
+- Before a compiler services action is called, the document is always automatically saved without question.
+  This is because I could not get the Haxe compiler to accept completions when using other (temporary) files, so I had it all happen on the actual code file instead.
+  This is not an issue for me at all, but if it is for you, don't use the package!
+
+* Issues
+- You MUST have a file with .hxml extension in the root project folder. (https://haxe.org/manual/compiler-usage-hxml.html)
+  You must have it for the compiler to know what to check and which libraries you depend on.
+  This file however does not exist in frameworks that compile your project differently (For example [[*Lime/OpenFL projects]], see that section for a solution).
+- This package doesn't handle multiple simultaneous projects or running multiple Haxe completion servers yet.
+  If you want to switch to another project, run the ~battle-haxe-start-server~ command in the new project.
+
+* Installation
+- First install the following required packages:
+  - ~company~
+  - ~helm~
+  - ~async~
+  - ~dash~
+  - ~f~
+  - ~s~
+- Download this package and add it to your load path, for example:
+#+begin_src elisp
+;; Tell emacs where is your personal elisp lib dir
+(add-to-list 'load-path "~/.emacs.d/lisp/")
+#+end_src
+- If you already have [[https://github.com/jwiegley/use-package][use-package]] then simply insert this to your init file:
+#+begin_src elisp
+(use-package battle-haxe
+  :bind (("S-<f4>" . #'pop-global-mark)
+         :map battle-haxe-mode-map
+         ("<f4>" . #'battle-haxe-goto-definition)
+         ("<f12>" . #'battle-haxe-helm-find-references))
+  :config
+  (add-to-list 'auto-mode-alist '("\\.hx\\'" . battle-haxe-indentation-mode))
+  (add-hook 'battle-haxe-indentation-mode-hook #'battle-haxe-services-mode))
+#+end_src
+
+* Lime/OpenFL projects
+The package uses the Haxe compiler directly and doesn't use Lime's "Project.xml" config file, but here is a template "some-project.hxml" to get you started for this use case:
+#+begin_src hxml
+-cp src
+-lib lime
+-lib openfl
+#+end_src
+
+* Notes
+- This package is intended to support only the latest and greatest Haxe compiler version.
+  Especially since the Haxe Compiler Services are actively developed and older versions don't have all of the features.
+- The included haxe-mode for formatting is merely a shortcut for js-mode which performs decent basic Haxe formatting.
+  (If you have a better formatting mode for Haxe then show me. js2-mode for example breaks down in more advanced Haxe files)
