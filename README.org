@@ -42,13 +42,12 @@ The main quirk is that the system has to force automatic saving of the edited Ha
 - If you have [[https://github.com/jwiegley/use-package][use-package]] then simply insert this to your init file to load the package:
 #+begin_src elisp
 (use-package battle-haxe
+  :mode ("\\.hx\\'" . battle-haxe-syntax-mode)
+  :hook (battle-haxe-syntax-mode-hook . battle-haxe-services-mode)
   :bind (("S-<f4>" . #'pop-global-mark) ;To get back after visiting a definition
          :map battle-haxe-services-mode-map
          ("<f4>" . #'battle-haxe-goto-definition)
-         ("<f12>" . #'battle-haxe-helm-find-references))
-  :config
-  (add-to-list 'auto-mode-alist '("\\.hx\\'" . battle-haxe-syntax-mode))
-  (add-hook 'battle-haxe-syntax-mode-hook #'battle-haxe-services-mode))
+         ("<f12>" . #'battle-haxe-helm-find-references)))
 #+end_src
 
 * Lime/OpenFL projects
