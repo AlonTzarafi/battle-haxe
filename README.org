@@ -21,7 +21,7 @@ The main quirk is that the system has to force automatic saving of the edited Ha
 
 * Big issue
 - Before a compiler services action is called, the document is always automatically saved without question.
-  This is because the Haxe compiler doesn't accept compiler services calls when using other (temporary) files, so I had Haxe process the real file path instead and had it forcibly saved.
+  This is because the Haxe compiler doesn't accept compiler services calls when using other (temporary) files, so for now I had Haxe process the real file path instead and had it forcibly saved.
   This is not an issue for me at all, but if it is for you, don't use the package!
 
 * Issues
@@ -52,7 +52,7 @@ The main quirk is that the system has to force automatic saving of the edited Ha
 #+end_src
 
 * Lime/OpenFL projects
-The package uses the Haxe compiler directly and doesn't use Lime's "Project.xml" config dfile,\\
+The package uses the Haxe compiler directly and doesn't use Lime's "Project.xml" config file,\\
 but here is a template "some-project.hxml" to get you started for this use case:
 #+begin_src hxml
 -cp src
@@ -62,7 +62,6 @@ but here is a template "some-project.hxml" to get you started for this use case:
 
 * Notes
 - This package is intended to support only the latest and greatest Haxe compiler version.
-  Especially since the Haxe Compiler Services are actively developed and older versions don't have all of the features.
 - The included battle-haxe-syntax-mode is merely a shortcut to js-mode which performs decent basic Haxe highlighting and indentation.
   (If you have a better base mode for Haxe syntax then I'd be interested to know. js2-mode for example breaks down in more advanced Haxe files)
 
