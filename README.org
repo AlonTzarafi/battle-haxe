@@ -2,15 +2,16 @@
 
 A development system for the Haxe programming language inside Emacs.
 
+#+ATTR_ORG: :width 500
 [[file:battle-haxe.png]]
 
 Provides code-completion and IDE-like features when editing Haxe code, provided by the Haxe compiler's [[https://haxe.org/manual/cr-completion-overview.html]["compiler services"]] in server mode.
 
 Defaults to a very basic js-mode for syntax highlighting that does the job.
 
-See [[*Installation]] section to get started.
+See [[https://github.com/AlonTzarafi/battle-haxe#installation][Installation]] section to get started.
 
-The main quirk is that the system has to force automatic saving of the edited Haxe buffer. ( [[*Big issue]] )
+The main quirk is that the system has to force automatic saving of the edited Haxe buffer. ( [[https://github.com/AlonTzarafi/battle-haxe#big-issue][Big issue]] )
 
 * Features
 - Member completion (via [[https://github.com/company-mode/company-mode][company-mode]]), for example after "myObject." or "override "
@@ -28,7 +29,7 @@ The main quirk is that the system has to force automatic saving of the edited Ha
 * Issues
 - You MUST have a file with .hxml extension in the root project folder. (https://haxe.org/manual/compiler-usage-hxml.html)
   You must have it for the compiler to know what to check and which libraries you depend on.
-  This file however does not exist in frameworks that compile your project differently (For example [[*Lime/OpenFL projects]], see that section for a solution).
+  This file however does not exist in frameworks that compile your project differently (For example [[https://github.com/AlonTzarafi/battle-haxe#limeopenfl-projects][Lime/OpenFL projects]], see that section for a solution).
 - This package doesn't handle multiple simultaneous projects or running multiple Haxe completion servers yet.
   If you want to switch to another project, run the ~battle-haxe-start-server~ command in the new project.
 
@@ -58,7 +59,8 @@ The main quirk is that the system has to force automatic saving of the edited Ha
 #+end_src
 
 * Lime/OpenFL projects
-The package uses the Haxe compiler directly and doesn't use Lime's "Project.xml" config file, but here is a template "some-project.hxml" to get you started for this use case:
+The package uses the Haxe compiler directly and doesn't use Lime's "Project.xml" config file,\\
+but here is a template "some-project.hxml" to get you started for this use case:
 #+begin_src hxml
 -cp src
 -lib lime
