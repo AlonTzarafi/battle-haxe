@@ -7,11 +7,9 @@ A development system for the Haxe programming language inside Emacs.
 Provides code-completion and IDE-like features when editing Haxe code, provided by the\\
 Haxe compiler's [[https://haxe.org/manual/cr-completion-overview.html]["compiler services"]] in server mode.
 
-Defaults to a very basic js-mode for syntax highlighting that does the job.
-
 See [[https://github.com/AlonTzarafi/battle-haxe#installation][Installation]] section to get started.
 
-The main quirk is that the system has to force automatic saving of the edited Haxe buffer. ( [[https://github.com/AlonTzarafi/battle-haxe#big-issue][Big issue]] )
+The main quirk is that the system has to force automatic saving of the edited Haxe File. ( [[https://github.com/AlonTzarafi/battle-haxe#big-issue][Big issue]] )
 
 * Features
 - Member completion (via [[https://github.com/company-mode/company-mode][company-mode]]), for example after "myObject." or "override "
@@ -49,7 +47,7 @@ The main quirk is that the system has to force automatic saving of the edited Ha
 - If you already have [[https://github.com/jwiegley/use-package][use-package]] then simply insert this to your init file:
 #+begin_src elisp
 (use-package battle-haxe
-  :bind (("S-<f4>" . #'pop-global-mark)
+  :bind (("S-<f4>" . #'pop-global-mark) ;To get back after visiting a definition
          :map battle-haxe-mode-map
          ("<f4>" . #'battle-haxe-goto-definition)
          ("<f12>" . #'battle-haxe-helm-find-references))
