@@ -1,11 +1,11 @@
-* battle-haxe
+* battle-haxe - a new weapon for your Emacs
 
-A development system for the Haxe programming language inside Emacs.
+A development system for the Haxe programming language.
 
 [[file:battle-haxe.png]]
 
-Provides code-completion and IDE-like features when editing Haxe code, provided by the\\
-Haxe compiler's [[https://haxe.org/manual/cr-completion-overview.html]["compiler services"]] in server mode.
+Battle-haxe adds code-completion and IDE-like features when editing Haxe code, provided by the\\
+Haxe compiler's [[https://haxe.org/manual/cr-completion-overview.html]["compiler services"]] feature in server mode.
 
 See [[https://github.com/AlonTzarafi/battle-haxe#installation][Installation]] section to get started.
 
@@ -14,14 +14,14 @@ The main quirk is that the system has to force automatic saving of the edited Ha
 * Features
 - Member completion (via [[https://github.com/company-mode/company-mode][company-mode]]), for example after "myObject." or "override "
 - Type completion, for example after "new " or "import "
-- If you auto-complete a class name for example after "new " it will automatically import the class as well
-- Jump to definition of current symbol with a key. Press another key to go back to where you were
-- Find all references (using [[https://github.com/emacs-helm/helm][helm]]) of the current symbol
+- If you auto-complete a class name, for example after "new " completion, it will automatically import the class as well
+- Jump to the definition of the current symbol with a key. Press another key to go back to where you were
+- Find all references of the current symbol (choose between them using [[https://github.com/emacs-helm/helm][helm]])
 - Eldoc support
 
 * Big issue
 - Before a compiler services action is called, the document is always automatically saved without question.
-  This is because I could not get the Haxe compiler to accept completions when using other (temporary) files, so I had it all happen on the actual code file instead.
+  This is because the Haxe compiler doesn't accept compiler services calls when using other (temporary) files, so I had Haxe process the real file path instead and had it forcibly saved.
   This is not an issue for me at all, but if it is for you, don't use the package!
 
 * Issues
@@ -32,19 +32,14 @@ The main quirk is that the system has to force automatic saving of the edited Ha
   If you want to switch to another project, run the ~battle-haxe-start-server~ command in the new project.
 
 * Installation
-- First install the following required packages:
-  - ~company~
-  - ~helm~
-  - ~async~
-  - ~dash~
-  - ~f~
-  - ~s~
+- First install the following packages which are required as dependencies:
+  - ~company~, ~helm~, ~async~, ~dash~, ~f~, ~s~
 - Download this package and add it to your load path, for example:
 #+begin_src elisp
-;; Tell emacs where is your personal elisp lib dir
-(add-to-list 'load-path "~/.emacs.d/lisp/")
+;; Tell Emacs where your elisp library sits
+(add-to-list 'load-path "~/.emacs.d/lisp/battle-haxe")
 #+end_src
-- If you already have [[https://github.com/jwiegley/use-package][use-package]] then simply insert this to your init file:
+- If you have [[https://github.com/jwiegley/use-package][use-package]] then simply insert this to your init file to load the package:
 #+begin_src elisp
 (use-package battle-haxe
   :bind (("S-<f4>" . #'pop-global-mark) ;To get back after visiting a definition
@@ -52,12 +47,12 @@ The main quirk is that the system has to force automatic saving of the edited Ha
          ("<f4>" . #'battle-haxe-goto-definition)
          ("<f12>" . #'battle-haxe-helm-find-references))
   :config
-  (add-to-list 'auto-mode-alist '("\\.hx\\'" . battle-haxe-indentation-mode))
-  (add-hook 'battle-haxe-indentation-mode-hook #'battle-haxe-services-mode))
+  (add-to-list 'auto-mode-alist '("\\.hx\\'" . battle-haxe-syntax-mode))
+  (add-hook 'battle-haxe-syntax-mode-hook #'battle-haxe-services-mode))
 #+end_src
 
 * Lime/OpenFL projects
-The package uses the Haxe compiler directly and doesn't use Lime's "Project.xml" config file,\\
+The package uses the Haxe compiler directly and doesn't use Lime's "Project.xml" config dfile,\\
 but here is a template "some-project.hxml" to get you started for this use case:
 #+begin_src hxml
 -cp src
@@ -68,8 +63,8 @@ but here is a template "some-project.hxml" to get you started for this use case:
 * Notes
 - This package is intended to support only the latest and greatest Haxe compiler version.
   Especially since the Haxe Compiler Services are actively developed and older versions don't have all of the features.
-- The included haxe-mode for formatting is merely a shortcut for js-mode which performs decent basic Haxe formatting.
-  (If you have a better formatting mode for Haxe then show me. js2-mode for example breaks down in more advanced Haxe files)
+- The included battle-haxe-syntax-mode is merely a shortcut to js-mode which performs decent basic Haxe highlighting and indentation.
+  (If you have a better base mode for Haxe syntax then I'd be interested to know. js2-mode for example breaks down in more advanced Haxe files)
 
 * Package naming
-I just found it funny that the language's creator gave it the name "Haxe" but pronounces it as "Axe"
+I just found it funny that the language's creator gave it the name "Haxe" but pronounces it as "Axe".

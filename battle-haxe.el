@@ -24,18 +24,20 @@
 ;;; Commentary:
 
 ;; This package offers a development system for the Haxe programming language.
-;; Code completion is supported using the company package.
-;; Options like "go to definition" and "find all references" are available, as well as eldoc support.
-;; The tools rely on the Haxe compiler's "compiler services" feature ( https://haxe.org/manual/cr-completion-overview.html ).
+;; Haxe code completion is activated using the `company-mode' package.
+;; Options like "go to definition" and "find all references" are available, as well as `eldoc' support.
+;; All of those features are triggered in `battle-haxe-services-mode' which also spawns a Haxe server to perform them.
+;; The tools rely on the Haxe "compiler services" feature ( https://haxe.org/manual/cr-completion-overview.html ).
 ;; The main quirk is that the system has to force automatic saving of the edited Haxe buffer.
 ;; If this is a problem for you don't use the package.
+;; A `battle-haxe-syntax-mode' is supplied but it actually uses `js-mode' for syntax highlighting and indentation.
 ;; See the project home page for more information.
 
 ;;; Code:
 
 ;; For completion
 (require 'company)
-;; For indentation
+;; For syntax highlighting and indentation
 (require 'js)
 ;; For find references
 (require 'helm)
@@ -70,8 +72,8 @@ They are sent to the compiler to call compiler services for this project.")
   "Keymap used for symbol `battle-haxe-services-mode'.")
 
 ;;;###autoload
-(define-derived-mode battle-haxe-indentation-mode js-mode "Haxe"
-  "Haxe indentation mode. This is simply using js-mode for now.")
+(define-derived-mode battle-haxe-syntax-mode js-mode "Haxe"
+  "Haxe syntax highlighting mode. This is simply using js-mode for now.")
 
 ;;;###autoload
 (define-minor-mode battle-haxe-services-mode
