@@ -2,10 +2,10 @@
 
 A development system for the Haxe programming language inside Emacs.
 
-#+ATTR_ORG: :width 500
 [[file:battle-haxe.png]]
 
-Provides code-completion and IDE-like features when editing Haxe code, provided by the Haxe compiler's [[https://haxe.org/manual/cr-completion-overview.html]["compiler services"]] in server mode.
+Provides code-completion and IDE-like features when editing Haxe code, provided by the\\
+Haxe compiler's [[https://haxe.org/manual/cr-completion-overview.html]["compiler services"]] in server mode.
 
 Defaults to a very basic js-mode for syntax highlighting that does the job.
 
