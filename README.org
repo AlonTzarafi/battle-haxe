@@ -48,7 +48,7 @@ The main quirk is that the system has to force automatic saving of the edited Ha
 #+begin_src elisp
 (use-package battle-haxe
   :bind (("S-<f4>" . #'pop-global-mark) ;To get back after visiting a definition
-         :map battle-haxe-mode-map
+         :map battle-haxe-services-mode-map
          ("<f4>" . #'battle-haxe-goto-definition)
          ("<f12>" . #'battle-haxe-helm-find-references))
   :config
@@ -70,3 +70,6 @@ but here is a template "some-project.hxml" to get you started for this use case:
   Especially since the Haxe Compiler Services are actively developed and older versions don't have all of the features.
 - The included haxe-mode for formatting is merely a shortcut for js-mode which performs decent basic Haxe formatting.
   (If you have a better formatting mode for Haxe then show me. js2-mode for example breaks down in more advanced Haxe files)
+
+* Package naming
+I just found it funny that the language's creator gave it the name "Haxe" but pronounces it as "Axe"
