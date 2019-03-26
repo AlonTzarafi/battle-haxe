@@ -1,4 +1,4 @@
-* battle-haxe - a new weapon for your Emacs
+* =battle-haxe= - a new weapon for your Emacs
 
 A development system for the Haxe programming language.
 
@@ -22,7 +22,7 @@ The main quirk is that the system has to force automatic saving of the edited Ha
 
 * Big issue
 - Before a compiler services action is called, the document is always automatically saved without question.
-  This is because the Haxe compiler doesn't accept compiler services calls when using other (temporary) files, so for now I had Haxe process the real file path instead and had it forcibly saved.
+  This is because the Haxe compiler doesn't accept compiler services calls when using other (temporary) files, so for now I had Haxe process the real file path instead and had the document forcibly saved.
   This is not an issue for me at all, but if it is for you, don't use the package!
 
 * Issues
@@ -33,14 +33,15 @@ The main quirk is that the system has to force automatic saving of the edited Ha
   If you want to switch to another project, run the ~battle-haxe-start-server~ command in the new project.
 
 * Installation
-- First install the following packages which are required as dependencies:
+- *First install the following packages which are required as dependencies:*
   - ~company~, ~helm~, ~async~, ~dash~, ~f~, ~s~
-- Download this package and add it to your load path, for example:
+  - optional dependency: ~yasnippet~
+- *Download this package and add it to your load path, for example:*
 #+begin_src elisp
 ;; Tell Emacs where your elisp library sits
 (add-to-list 'load-path "~/.emacs.d/lisp/battle-haxe")
 #+end_src
-- If you have [[https://github.com/jwiegley/use-package][use-package]], this is a template you can customize and insert to your init file to load the package:
+- *If you have [[https://github.com/jwiegley/use-package][use-package]], this is a template you can customize and insert to your init file to load the package:*
 #+begin_src elisp
 (use-package battle-haxe
   :mode ("\\.hx\\'" . battle-haxe-syntax-mode)
@@ -63,9 +64,9 @@ but here is a template "some-project.hxml" to get you started for this use case:
 #+end_src
 
 * Notes
-- This package is intended to support only the latest and greatest Haxe compiler version.
-- The included battle-haxe-syntax-mode is merely a shortcut to js-mode which performs decent basic Haxe highlighting and indentation.
-  (If you have a better base mode for Haxe syntax then I'd be interested to know. js2-mode for example breaks down in more advanced Haxe files)
+- This package is intended to support only the latest and greatest Haxe compiler version (currently =4.0.0-rc.1=).
+- The included battle-haxe-syntax-mode is merely a shortcut to ~js-mode~ which performs decent basic Haxe highlighting and indentation.
+  (If you have a better base mode for Haxe syntax then I'd be interested to know. js2-mode for example breaks down in more advanced Haxe files.)
 
 * Package naming
 I just found it funny that the language's creator gave it the name "Haxe" but pronounces it as "Axe".
