@@ -1,4 +1,4 @@
-;;; battle-haxe.el --- A Haxe development system, with code completion and more ;; -*- lexical-binding: t -*-
+;;; battle-haxe.el --- A Haxe development system, with code completion and more  -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2019-2019  Alon Tzarafi
 
@@ -66,6 +66,13 @@ They are sent to the compiler to call compiler services for this project.")
 (defvar battle-haxe-server-process nil
   "References a currently running Haxe server process if any.")
 
+(defvar-local battle-haxe-cached-completion-context nil
+  "Buffer-local saved result of (battle-haxe-get-line-and-hash-other-lines).
+Used to determine if a new call to Haxe compiler services is needed.")
+
+(defvar-local battle-haxe-cached-completion-response nil
+  "Buffer-local saved copy of last company completion server response.")
+
 (defvar battle-haxe-services-mode-map
   (let ((map (make-sparse-keymap)))
     map)
@@ -110,7 +117,6 @@ They are sent to the compiler to call compiler services for this project.")
     
     (candidates (battle-haxe-candidates))
     
-    ;; TODO: Test if can get it working without this
     (no-cache t)
     
     (sorted t)
@@ -201,76 +207,149 @@ The Haxe compiler services is then called to indentify the class."
             (insert (concat "import " full-class-name ";"))
             (message (concat "Class added to import list: " full-class-name)))))))
 
+(defun battle-haxe-get-line-and-hash-other-lines ()
+  "Return an alist with 3 elements used to detect any change in buffer:
+'line-num: The number of current line.
+'line-str: The string of current line - up until the cursor.
+'rest-hash: A Hash computed from every line except the current one.
+'time-taken: The time at which this data was collected."
+  (list
+   (cons 'line-num
+         (line-number-at-pos))
+   (cons 'line-str
+         (buffer-substring-no-properties
+          (line-beginning-position) (point)))
+   (cons 'rest-hash
+         (concat (sha1 (buffer-substring-no-properties
+                        1 (line-beginning-position)))
+                 (sha1 (buffer-substring-no-properties
+                        (line-end-position) (point-max)))))
+   (cons 'time-taken
+         (float-time))))
+
 (defun battle-haxe-candidates ()
-  "The main company-completion function.
+  "The main company completion function.
+Decides when to use last cached candidates data and when to request from server again."
+  (when buffer-file-name
+    (let* ((line-num (alist-get 'line-num battle-haxe-cached-completion-context))
+           (line-str (alist-get 'line-str battle-haxe-cached-completion-context))
+           (rest-hash (alist-get 'rest-hash battle-haxe-cached-completion-context))
+           (time-taken (alist-get 'time-taken battle-haxe-cached-completion-context))
+           (use-cached (and
+                        ;; has valid time in the last 30 seconds
+                        time-taken
+                        (> 30 (- (float-time) time-taken))
+                        ;; same line num
+                        (= line-num (line-number-at-pos))
+                        (let ((current (battle-haxe-get-line-and-hash-other-lines)))
+                          (and
+                           ;; same hash
+                           (string= rest-hash (alist-get 'rest-hash current))
+                           ;; ensure the saved line in scope
+                           (>= (- (point) (line-beginning-position)) (length line-str))
+                           ;; same initial part of line
+                           (eq 0 (cl-search line-str (alist-get 'line-str current))))))))
+      
+      (if use-cached
+          ;; Approve a previous cached data
+          (unless (alist-get 'approved battle-haxe-cached-completion-context)
+            (add-to-list 'battle-haxe-cached-completion-context '(approved . t)))
+        ;; Sets the context for next time.
+        ;; Note that later on the 'line-str will be updated and cropped to the beginning of the inserted member.
+        (setq battle-haxe-cached-completion-context (battle-haxe-get-line-and-hash-other-lines))))
+    
+    (battle-haxe-compute-candidates)))
+
+(defun battle-haxe-compute-candidates ()
+  "Return candidates for use by the command `company-complete'.
 Can complete either a Haxe class/object's member or a Haxe type.
 Checks already entered text to match with target member/type.
-Asynchonously send a list of candidates to the 'company-mode'."
-  (when buffer-file-name
-    (let*
-        ((is-done? nil)
-         
-         (inserted-member (unless is-done? (battle-haxe-inserted-member)))
-         (is-done? (or is-done? inserted-member))
-         (inserted-type (unless is-done? (battle-haxe-inserted-type)))
-         (is-done? (or is-done? inserted-type))
-         
-         (completions-parser nil)
-         (inserted-text nil)
-         (haxe-compiler-services-mode nil)
-         
-         ;;choose completion type:
-         (which-completion
-          (cond
-           (inserted-member
-            (progn
-              (setq completions-parser #'battle-haxe-member-completions-from-xml)
-              (setq inserted-text inserted-member)
-              ;; (setq haxe-compiler-services-mode "@position")
-              'complete-member-or-type))
-           (inserted-type
-            (progn
-              (setq completions-parser #'battle-haxe-type-completions-from-xml)
-              (setq inserted-text inserted-type)
-              ;; (setq haxe-compiler-services-mode "@type")
-              'complete-member-or-type))
-           (t 'none))))
+Send nil if nothing to complete."
+  (let*
+      ((is-done? nil)
+       
+       (inserted-member (unless is-done? (battle-haxe-inserted-member)))
+       (is-done? (or is-done? inserted-member))
+       (inserted-type (unless is-done? (battle-haxe-inserted-type)))
+       (is-done? (or is-done? inserted-type))
+       
+       (completions-parser nil)
+       (inserted-text nil)
+       (haxe-compiler-services-mode nil)
+       
+       ;;choose completion type:
+       (which-completion
+        (cond
+         (inserted-member
+          (progn
+            (setq completions-parser #'battle-haxe-member-completions-from-xml)
+            (setq inserted-text inserted-member)
+            ;; (setq haxe-compiler-services-mode "@position")
+            'complete-member-or-type))
+         (inserted-type
+          (progn
+            (setq completions-parser #'battle-haxe-type-completions-from-xml)
+            (setq inserted-text inserted-type)
+            ;; (setq haxe-compiler-services-mode "@type")
+            'complete-member-or-type))
+         (t 'none))))
 
-      is-done?                          ;Yeah... It's done
-      
-      (case which-completion
-        (complete-member-or-type
-         (let* ((inserted-member-begin (- (point) (length inserted-text)))
-                (haxe-point (battle-haxe-get-haxe-point inserted-member-begin)))
-           
-           ;; let Haxe compiler read this file before proceeding to call the server
-           (battle-haxe-save-buffer-silently)
-           
-           (battle-haxe-company-async-candidates
-            haxe-point
-            haxe-compiler-services-mode
-            completions-parser
-            inserted-text)))
-        (none
-         nil)))))
+    is-done?                          ;Yeah... It's done
+    
+    (case which-completion
+      (complete-member-or-type
+       (let* ((inserted-member-begin (- (point) (length inserted-text)))
+              (haxe-point (battle-haxe-get-haxe-point inserted-member-begin)))
+         
+         ;; Final test of approval - same completion point
+         (if (alist-get 'approved battle-haxe-cached-completion-context)
+             (let ((completion-point-char (- inserted-member-begin (line-beginning-position)))
+                   (line-str-length (length (alist-get 'line-str battle-haxe-cached-completion-context))))
+               (unless (= completion-point-char line-str-length)
+                 ;; Unapprove
+                 (setq battle-haxe-cached-completion-context nil))))
+         
+         ;; Update the cache if any, to match only until completion point
+         (if battle-haxe-cached-completion-context
+             (add-to-list 'battle-haxe-cached-completion-context
+                          (cons 'line-str
+                                (buffer-substring-no-properties
+                                 (line-beginning-position) inserted-member-begin))))
+         
+         ;; Let Haxe compiler read this file before proceeding to call the server
+         (unless (alist-get 'approved battle-haxe-cached-completion-context)
+           (battle-haxe-save-buffer-silently))
+         
+         (battle-haxe-company-candidates
+          haxe-point
+          haxe-compiler-services-mode
+          completions-parser
+          inserted-text)))
+      (none
+       nil))))
 
-(defun battle-haxe-company-async-candidates (haxe-point haxe-compiler-service completions-parser inserted-text)
-  "Return a cons pair that company accepts as an async completion.
+(defun battle-haxe-company-candidates (haxe-point haxe-compiler-service completions-parser inserted-text)
+  "Return a company completion with the given parameters.
 HAXE-POINT is the haxe-point.
 HAXE-COMPILER-SERVICE is haxe compiler services mode (example: '@type').
 COMPLETIONS-PARSER is a function that transforms the XML result string
 into candidates.
-INSERTED-TEXT is sent to the parser to help match some candidates."
+INSERTED-TEXT is sent to the parser to help match some candidates.
+If a cache is valid, return it right away, else return async candidates."
   (let ((process-result
          (lambda (xml-str)
            ;; Got server results
-           (funcall completions-parser xml-str inserted-text))))
-    (cons :async (lambda (callback)
-                   (battle-haxe-get-completions
-                    haxe-point
-                    haxe-compiler-service
-                    (lambda (xml-str)
-                      (funcall callback (funcall process-result xml-str))))))))
+           (funcall completions-parser xml-str inserted-text)))
+        (use-cached (alist-get 'approved battle-haxe-cached-completion-context)))
+    (if use-cached
+        (funcall process-result battle-haxe-cached-completion-response)
+      (cons :async (lambda (callback)
+                     (battle-haxe-get-completions
+                      haxe-point
+                      haxe-compiler-service
+                      (lambda (xml-str)
+                        (let ((candidates (funcall process-result xml-str)))
+                          (funcall callback candidates)))))))))
 
 (defun battle-haxe-get-completions (haxe-point haxe-compiler-service callback)
   "Call a compiler services completion command and pass result to CALLBACK.
@@ -279,6 +358,7 @@ The command is called in HAXE-POINT using the mode in HAXE-COMPILER-SERVICE."
          (command-result (shell-command-to-string
                           command-to-call)))
     ;; When done:
+    (setq battle-haxe-cached-completion-response command-result)
     (funcall callback command-result)))
 
 (defun battle-haxe-resolve-hxml-candidates ()
@@ -534,18 +614,15 @@ as reported by Haxe compiler services."
 
 (defun battle-haxe-inserted-member ()
   "Return a typed member name in a Haxe buffer, or nil if not typing a member."
-  (let*
-      ((beg-of-line
-        (save-excursion (beginning-of-line) (point)))
-       (inserted-member
-        (save-excursion
-          (if
-              (re-search-backward
-               "\\(?:[.]\\|override \\)\\([[:alnum:]\\|_]*\\)\\="
-               beg-of-line
-               t)
-              (match-string 1)
-            nil))))
+  (let ((inserted-member
+         (save-excursion
+           (if
+               (re-search-backward
+                "\\(?:[.]\\|override \\)\\([[:alnum:]\\|_]*\\)\\="
+                (line-beginning-position)
+                t)
+               (match-string 1)
+             nil))))
     inserted-member))
 
 (defun battle-haxe-inserted-type ()
@@ -558,8 +635,7 @@ However, in lines like this:
 function fun():
 The colon is accepted as a prefix to a Haxe type (and completion can trigger)."
   (let*
-      ((beg-of-line
-        (save-excursion (beginning-of-line) (point)))
+      ((beg-of-line (line-beginning-position))
        (is-switch-case-colon
         (save-excursion
           (if
@@ -587,15 +663,13 @@ That is, the function you're currently writing arguments to.
 If found, return a buffer position that sits in this function's name.
 If no function found, return current point."
   (or (let*
-          ((beg-of-line
-            (save-excursion (beginning-of-line) (point)))
-           (pos-at-function
+          ((pos-at-function
             (save-excursion
               (if
                   (re-search-backward
                    "\\([[:alnum:]]\\)[[:space:]]*[(][^(]*\\="
                    ;;TODO: Maybe later allow multi-line function calls?
-                   beg-of-line
+                   (line-beginning-position)
                    t)
                   (match-beginning 1)
                 nil))))
@@ -733,7 +807,7 @@ The result will be returned to CALLBACK."
                                   (cons 'name result-name)
                                   (cons 'xml-root result-xml-root)
                                   (cons 'is-function? is-function?)))))))))))
-          ;; Found something and trying asynchronously but return nil so eldoc doesn't launch
+          ;; Found something, and fetching data asynchronously, but return nil for now so eldoc doesn't launch yet
           nil)
       ;; Not on a function
       nil)))
