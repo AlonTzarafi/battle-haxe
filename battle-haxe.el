@@ -650,7 +650,7 @@ The colon is accepted as a prefix to a Haxe type (and completion can trigger)."
           (save-excursion
             (if
                 (re-search-backward
-                 "\\(?::\\|[[:blank:]]\\(?:new \\|import \\|using \\|\)\\)\\)\\([[:alnum:]\\|_]*\\)\\="
+                 "\\(?::\\|[^[:alnum:]]\\(?:new \\|import \\|using \\|\)\\)\\)\\([[:alnum:]\\|_]*\\)\\="
                  beg-of-line
                  t)
                 (match-string 1)
