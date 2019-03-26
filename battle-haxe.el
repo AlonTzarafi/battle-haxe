@@ -76,6 +76,12 @@ Used to determine if a new call to Haxe compiler services is needed.")
 (defvar-local battle-haxe-cached-completion-response nil
   "Buffer-local saved copy of last company completion server response.")
 
+(defconst battle-haxe-symbol-chars "[[:alnum:]?_]"
+  "Characters allowed in Haxe symbol names.")
+
+(defconst battle-haxe-non-symbol-chars "[^[:alnum:]?_]"
+  "Characters disallowed in Haxe symbol names.")
+
 (defvar battle-haxe-services-mode-map
   (let ((map (make-sparse-keymap)))
     map)
@@ -662,22 +668,27 @@ The colon is accepted as a prefix to a Haxe type (and completion can trigger)."
               nil)))))
     inserted-member))
 
-(defun battle-haxe-typed-function()
-  "Try to find the position the of 'current' function.
-That is, the function you're currently writing arguments to.
-If found, return a buffer position that sits in this function's name.
-If no function found, return current point."
+(defun battle-haxe-try-find-enclosing-function-call ()
+  "Try to find the 'current' function call.
+That is, the function/constructor you're currently writing arguments to.
+If found, return a buffer position that sits in the function/constructor's name.
+If no function call found, return current point."
   (or (let*
           ((pos-at-function
             (save-excursion
-              (if
-                  (re-search-backward
-                   "\\([[:alnum:]]\\)[[:space:]]*[(][^(]*\\="
-                   ;;TODO: Maybe later allow multi-line function calls?
-                   (line-beginning-position)
-                   t)
-                  (match-beginning 1)
-                nil))))
+              (or
+               (re-search-backward
+                (concat "\\(\\)new \\("battle-haxe-symbol-chars"*\\)[[:space:]]*\([^(]*\\=")
+                (line-beginning-position)
+                t)
+               (if
+                   (re-search-backward
+                    (concat "\\("battle-haxe-symbol-chars"\\)[[:space:]]*[(][^(]*\\=")
+                    ;;TODO: Maybe later allow multi-line function calls?
+                    (line-beginning-position)
+                    t)
+                   (match-beginning 1)
+                 nil)))))
         pos-at-function)
       (point)))
 
@@ -761,7 +772,7 @@ such as @position."
   "Calculate a cons result of (name . xml) about the current function.
 That is, the Haxe function you're currently typing or typing arguments to.
 The result will be returned to CALLBACK."
-  (let ((function-info (battle-haxe-typed-function)))
+  (let ((function-info (battle-haxe-try-find-enclosing-function-call)))
     (if function-info
         (let* ((function-pos function-info)
                (shell-cmd (battle-haxe-make-command-string
@@ -1039,20 +1050,18 @@ Or insert regularly, but without any method arg list."
 
 (defun battle-haxe-split-candidate (candidate)
   "Split CANDIDATE to a name, and a list of arguments (if any)."
-  (let* ((haxe-symbol-chars "[[:alnum:]?_]")
-         (haxe-non-symbol-chars "[^[:alnum:]?_]")
-         (name (first (battle-haxe-string-regex-results (concat "\\("haxe-symbol-chars"*\\).*") 1 candidate)))
+  (let* ((name (first (battle-haxe-string-regex-results (concat "\\("battle-haxe-symbol-chars"*\\).*") 1 candidate)))
          (is-method (cl-search "(" candidate))
          (args-str-raw
           (and is-method
-               (battle-haxe-string-regex-results (concat ""haxe-symbol-chars"*\(\\(.*\\)\)") 1 candidate)))
+               (battle-haxe-string-regex-results (concat ""battle-haxe-symbol-chars"*\(\\(.*\\)\)") 1 candidate)))
          (args-str (if args-str-raw (first args-str-raw) ""))
          (args nil))
     ;; Arguments
     (setq args
           (-map (lambda (arg)
                   (substring arg 0
-                             (string-match haxe-non-symbol-chars arg)))
+                             (string-match battle-haxe-non-symbol-chars arg)))
                 (split-string args-str ", " ",")))
     (list
      (cons 'name name)
