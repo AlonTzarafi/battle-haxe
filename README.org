@@ -18,6 +18,7 @@ The main quirk is that the system has to force automatic saving of the edited Ha
 - Jump to the definition of the current symbol with a key. Press another key to go back to where you were
 - Find all references of the current symbol (choose between them using [[https://github.com/emacs-helm/helm][helm]])
 - Eldoc support
+- Optionally expand method calls completions using [[https://github.com/joaotavora/yasnippet][yasnippet]].
 
 * Big issue
 - Before a compiler services action is called, the document is always automatically saved without question.
@@ -39,7 +40,7 @@ The main quirk is that the system has to force automatic saving of the edited Ha
 ;; Tell Emacs where your elisp library sits
 (add-to-list 'load-path "~/.emacs.d/lisp/battle-haxe")
 #+end_src
-- If you have [[https://github.com/jwiegley/use-package][use-package]] then simply insert this to your init file to load the package:
+- If you have [[https://github.com/jwiegley/use-package][use-package]], this is a template you can customize and insert to your init file to load the package:
 #+begin_src elisp
 (use-package battle-haxe
   :mode ("\\.hx\\'" . battle-haxe-syntax-mode)
@@ -47,7 +48,9 @@ The main quirk is that the system has to force automatic saving of the edited Ha
   :bind (("S-<f4>" . #'pop-global-mark) ;To get back after visiting a definition
          :map battle-haxe-services-mode-map
          ("<f4>" . #'battle-haxe-goto-definition)
-         ("<f12>" . #'battle-haxe-helm-find-references)))
+         ("<f12>" . #'battle-haxe-helm-find-references))
+  :custom
+  (battle-haxe-yasnippet-completion-expansion t "Keep this if you want yasnippet to expand completions."))
 #+end_src
 
 * Lime/OpenFL projects

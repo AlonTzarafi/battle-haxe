@@ -1,4 +1,4 @@
-;;; battle-haxe.el --- A Haxe development system, with code completion and more  -*- lexical-binding: t -*-
+;;; battle-haxe.el --- A Haxe development system, with code completion and more -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2019-2019  Alon Tzarafi
 
@@ -44,14 +44,17 @@
 ;; For non-blocking operations
 (require 'async)
 ;; For helper functions
-;;  (built in)
+;; -- (built in)
 (require 'cl-lib)
 (require 'subr-x)
 (require 'xml)
-;;  (downloaded)
+;; -- (downloaded)
 (require 'dash)
 (require 's)
 (require 'f)
+
+(defvar battle-haxe-yasnippet-completion-expansion nil
+  "When non-nil, battle-haxe will expand completions using yasnippet when available.")
 
 (defvar battle-haxe-cwd nil
   "Current working directory, or current project folder to pass to Haxe.")
@@ -137,7 +140,9 @@ Used to determine if a new call to Haxe compiler services is needed.")
      (delete-char (- (battle-haxe-get-prop arg 'matchlen)))
      (forward-char (length arg))
      ;; After "new MyClass()" completion also auto-import it
-     (battle-haxe-ensure-object-at-point-is-imported (battle-haxe-get-prop arg 'ensure-import))))
+     (battle-haxe-ensure-object-at-point-is-imported (battle-haxe-get-prop arg 'ensure-import))
+     ;; Finalize inserted text
+     (battle-haxe-perform-result-expansion arg)))
   )
 
 (defun battle-haxe-get-haxe-point (&optional target-point filename)
@@ -1016,6 +1021,63 @@ Choosing between the results is done with helm."
          "\\(?:[[:blank:]]\\)*\\(.*\\)$"
          filename line char)
         "")))
+
+(defun battle-haxe-perform-result-expansion (candidate)
+  "Called after CANDIDATE is inserted.
+Either insert interactively using yasnippet,
+Or insert regularly, but without any method arg list."
+  (delete-region (- (point) (length candidate)) (point))
+  (let* ((split (battle-haxe-split-candidate candidate))
+         (use-yasnippet (and
+                         battle-haxe-yasnippet-completion-expansion
+                         (bound-and-true-p yas-minor-mode)
+                         ;; Only for functions
+                         (alist-get 'args split))))
+    (if use-yasnippet
+        (yas-expand-snippet (battle-haxe-make-yasnippet-template split))
+      (insert (alist-get 'name split)))))
+
+(defun battle-haxe-split-candidate (candidate)
+  "Split CANDIDATE to a name, and a list of arguments (if any)."
+  (let* ((haxe-symbol-chars "[[:alnum:]?_]")
+         (haxe-non-symbol-chars "[^[:alnum:]?_]")
+         (name (first (battle-haxe-string-regex-results (concat "\\("haxe-symbol-chars"*\\).*") 1 candidate)))
+         (is-method (cl-search "(" candidate))
+         (args-str-raw
+          (and is-method
+               (battle-haxe-string-regex-results (concat ""haxe-symbol-chars"*\(\\(.*\\)\)") 1 candidate)))
+         (args-str (if args-str-raw (first args-str-raw) ""))
+         (args nil))
+    ;; Arguments
+    (setq args
+          (-map (lambda (arg)
+                  (substring arg 0
+                             (string-match haxe-non-symbol-chars arg)))
+                (split-string args-str ", " ",")))
+    (list
+     (cons 'name name)
+     (cons 'args args))))
+
+(defun battle-haxe-make-yasnippet-template (candidate-split)
+  "Convert CANDIDATE-SPLIT to a yasnippet template."
+  (let ((name (alist-get 'name candidate-split))
+        (args (alist-get 'args candidate-split)))
+    ;; Process arguments
+    (setq args
+          (let ((last (-last-item args)))
+            (--map (if (string= it last)
+                       (format "${%s}" it)
+                     (format "${%s}, " it))
+                   args)))
+    ;; Process template
+    (list
+     )
+    (apply
+     #'concat
+     (append
+      (list name "(")
+      args
+      (list ")")))))
 
 (add-to-list 'company-backends #'battle-haxe-company-backend)
 
