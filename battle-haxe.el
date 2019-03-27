@@ -759,23 +759,36 @@ such as @position."
               3
               pos-string)))
 
+
 (defun battle-haxe-eldoc-detect-signature-parts (signature-string)
-  "Break down SIGNATURE-STRING into args and return value.
-The signature is assumed to be of a Haxe function."
-  (with-temp-buffer
-    (insert signature-string)
-    (goto-char 0)
-    (goto-char (scan-sexps (point) 1))
-    (let* ((args (substring (buffer-string) 0 (- (point) 1)))
-           (returnval (first
-                       (battle-haxe-string-regex-results
-                        "-> \\(.*\\)"
-                        1
-                        (substring (buffer-string) (point) (length (buffer-string))))))
-           (fixed-args (if (string= args "Void") "()" args)))
-      (list
-       (cons 'args fixed-args)
-       (cons 'returnval returnval)))))
+  "Break down SIGNATURE-STRING into args, and return value.
+If not a function signature, the output 'args will be empty,
+and the 'returnval will be the full signature."
+  (let ((len (length signature-string)))
+    (with-temp-buffer
+      (insert signature-string)
+      (goto-char 0)
+      (if (or
+           (string= "(" (substring signature-string 0 1))
+           (and (<= 5 len)
+                (string= "Void " (substring signature-string 0 5))))
+          (progn
+            (goto-char (scan-sexps (point) 1))
+            (let* ((args (substring (buffer-string) 0 (- (point) 1)))
+                   (returnval (first
+                               (battle-haxe-string-regex-results
+                                "-> \\(.*\\)"
+                                1
+                                (substring (buffer-string)
+                                           (min (point) len)
+                                           len))))
+                   (fixed-args (if (string= args "Void") "()" args)))
+              (list
+               (cons 'args fixed-args)
+               (cons 'returnval returnval))))
+        (list
+         (cons 'args "")
+         (cons 'returnval signature-string))))))
 
 (defun battle-haxe-is-invalid-pos-string (pos-string)
   "Check if this POS-STRING is actually a returned error message from the server."
