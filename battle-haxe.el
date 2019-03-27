@@ -350,7 +350,8 @@ If a cache is valid, return it right away, else return async candidates."
   (let ((process-result
          (lambda (xml-str)
            ;; Got server results
-           (funcall completions-parser xml-str inserted-text)))
+           (-filter (-not #'string-empty-p)
+                    (funcall completions-parser xml-str inserted-text))))
         (use-cached (alist-get 'approved battle-haxe-cached-completion-context)))
     (if use-cached
         (funcall process-result battle-haxe-cached-completion-response)
@@ -546,7 +547,7 @@ The completion candidate is matched to INSERTED-TEXT."
 
 (defun battle-haxe-set-prop (completion property value)
   "Put a text-property PROPERTY with value VALUE in string COMPLETION."
-  (if completion
+  (if (and completion (not (string-empty-p completion)))
       (put-text-property 0 1 property value completion)))
 
 (defun battle-haxe-get-prop (completion property &optional default-value)
