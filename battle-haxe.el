@@ -684,7 +684,7 @@ If no function call found, return current point."
                (if
                    (re-search-backward
                     (concat "\\("battle-haxe-symbol-chars"\\)[[:space:]]*[(][^(]*\\=")
-                    ;;TODO: Maybe later allow multi-line function calls?
+                    ;;TODO: Allow detection of multi-line function calls. Maybe use (backward-up-list) until hit a "("
                     (line-beginning-position)
                     t)
                    (match-beginning 1)
@@ -734,21 +734,15 @@ If nothing found to fetch type information to, do nothing."
                 (is-function? (alist-get 'is-function? function-xml-details))
                 (node-name (xml-node-name (xml-node-children (xml-node-name root))))
                 (signature (battle-haxe-first-real-line-of node-name))
-                (signature-parts (battle-haxe-string-regex-results "\\(.*\\) -> \\(.*\\)" 2 signature))
-                (args (nth 0 signature-parts))
-                (fixed-args (if (string= args "Void") "()" args))
-                (returnval (nth 1 signature-parts)))
+                (signature-parts (battle-haxe-eldoc-detect-signature-parts signature))
+                (args (alist-get 'args signature-parts))
+                (returnval (alist-get 'returnval signature-parts)))
              (if name
                  (eldoc-message
                   (if is-function?
-                      (concat
-                       ;; node-name fixed-args " : " returnval
-                       ;; name "(" args ") : " returnval
-                       name fixed-args " : " returnval
-                       )
+                      (concat name args " : " returnval)
                     (concat
-                     name " : " signature
-                     ))))))))))
+                     name " : " signature))))))))))
 
 (defun battle-haxe-first-real-line-of (str)
   "Get the first non-empty line in STR."
@@ -763,6 +757,24 @@ such as @position."
               "[[:space:]]*\\(.*\\):\\([[:digit:]]*\\): characters \\([[:digit:]]*\\)-[[:digit:]]*"
               3
               pos-string)))
+
+(defun battle-haxe-eldoc-detect-signature-parts (signature-string)
+  "Break down SIGNATURE-STRING into args and return value.
+The signature is assumed to be of a Haxe function."
+  (with-temp-buffer
+    (insert signature-string)
+    (goto-char 0)
+    (goto-char (scan-sexps (point) 1))
+    (let* ((args (substring (buffer-string) 0 (- (point) 1)))
+           (returnval (first
+                       (battle-haxe-string-regex-results
+                        "-> \\(.*\\)"
+                        1
+                        (substring (buffer-string) (point) (length (buffer-string))))))
+           (fixed-args (if (string= args "Void") "()" args)))
+      (list
+       (cons 'args fixed-args)
+       (cons 'returnval returnval)))))
 
 (defun battle-haxe-is-invalid-pos-string (pos-string)
   "Check if this POS-STRING is actually a returned error message from the server."
