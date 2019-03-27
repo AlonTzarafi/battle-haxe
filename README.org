@@ -45,7 +45,7 @@ The main quirk is that the system has to force automatic saving of the edited Ha
 #+begin_src elisp
 (use-package battle-haxe
   :mode ("\\.hx\\'" . battle-haxe-syntax-mode)
-  :hook (battle-haxe-syntax-mode-hook . battle-haxe-services-mode)
+  :hook (battle-haxe-syntax-mode . battle-haxe-services-mode)
   :bind (("S-<f4>" . #'pop-global-mark) ;To get back after visiting a definition
          :map battle-haxe-services-mode-map
          ("<f4>" . #'battle-haxe-goto-definition)
