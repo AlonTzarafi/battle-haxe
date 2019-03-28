@@ -437,11 +437,12 @@ the COMPILER-SERVICES-MODE is appended to the haxe-point in the --display argume
 
 (defun battle-haxe-get-xml-root (xml-string)
   "Get a root XML object from the provided XML-STRING."
-  (with-temp-buffer
-    (progn
-      (insert xml-string)
-      (ignore-errors
-        (xml-parse-region (point-min) (point-max))))))
+  (if (stringp xml-string)
+      (with-temp-buffer
+        (progn
+          (insert xml-string)
+          (ignore-errors
+            (xml-parse-region (point-min) (point-max)))))))
 
 (defun battle-haxe-member-completions-from-xml (xml-str inserted-text)
   "Parse the XML-STR string returned from the Haxe server.
