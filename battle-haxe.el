@@ -468,10 +468,13 @@ The result is the full list of processed completion candidates."
        (completions-sorted (sort
                             completions-filtered
                             (lambda (a b)
+                              ;; Mostly sort by match length,
+                              ;; but give priority to matches that match at an earlier point
                               (>
-                               (battle-haxe-get-prop a 'matchlen 0)
-                               (battle-haxe-get-prop b 'matchlen 0))
-                              )))
+                               (- (battle-haxe-get-prop a 'matchlen 0)
+                                  (* 0.001 (battle-haxe-get-prop a 'matchbegin 0)))
+                               (- (battle-haxe-get-prop b 'matchlen 0)
+                                  (* 0.001 (battle-haxe-get-prop b 'matchbegin 0)))))))
        (completions completions-sorted))
     completions))
 
@@ -502,6 +505,7 @@ The completion candidate is matched to INSERTED-TEXT."
        (docstring (car (cdr (cdr (nth 0 (xml-get-children completion-xml-node 'd))))))
        (match (battle-haxe-calc-match inserted-text name))
        ;;NOTE: change this if matching smartly to multiple sections
+       (matchbegin (car (first match)))
        (matchlen
         (if match
             (- (cdr (first match)) (car (first match)))
@@ -514,6 +518,7 @@ The completion candidate is matched to INSERTED-TEXT."
     (battle-haxe-set-prop output 'docstring docstring)
     (battle-haxe-set-prop output 'match match)
     (battle-haxe-set-prop output 'matchlen matchlen)
+    (battle-haxe-set-prop output 'matchbegin matchbegin)
     output))
 
 (defun battle-haxe-type-completion-xml-node-processor (completion-xml-node inserted-text)
