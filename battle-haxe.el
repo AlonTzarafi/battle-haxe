@@ -478,14 +478,14 @@ The completion candidate is matched to INSERTED-TEXT."
        (kind (cdr (assoc 'k competion-attrs)))
        (type (or (car (cdr (cdr (nth 0 (xml-get-children completion-xml-node 't)))))
                  ""))
+
+       (parts (battle-haxe-detect-signature-parts type))
        
        (name (battle-haxe-set-string-face
               'apropos-function-button
               (concat
                (cdr (assoc 'n competion-attrs))
-               (if (string= kind "method")
-                   (car (battle-haxe-split-function-type type))
-                 ""))))
+               (alist-get 'args parts))))
        
        ;; (error-check (unless (stringp name)
        ;;                (error "Error. Couldn't parse completion node's name")))
@@ -574,41 +574,16 @@ Optionally provide a DEFAULT-VALUE if not found."
 
 (defun battle-haxe-annotation (name)
   "Annotate a completion-candidate NAME accodring to the attached meta-data."
-  (let ((kind (get-text-property 0 'kind name))
-        (type (get-text-property 0 'type name)))
-    (if (and (string= kind "method") (string-match-p "->" name))
-        (progn
-          (let* ((split (battle-haxe-split-function-type type))
-                 ;; (args (car split))
-                 (return-type (cdr split)))
-            (concat
-             " : "
-             return-type
-             )))
+  (let* ((type (get-text-property 0 'type name))
+         (parts (battle-haxe-detect-signature-parts type))
+         (return-type (alist-get 'return-val parts))
+         (is-method (alist-get 'is-method parts)))
+    (if is-method
+        (concat
+         " : "
+         return-type
+         )
       (concat ": " type))))
-
-(defun battle-haxe-split-function-type (function-type)
-  "Return a cons pair of (function-args . return-type) strings.
-FUNCTION-TYPE is the full function type string,
-as reported by Haxe compiler services."
-  (string-match "\\(.*\\(?:\\|Void\\).*\\)\\( -> \\)\\(.*\\)" function-type)
-  (let* (;; (total-length (length function-type))
-         (match-beg (match-beginning 2))
-         (valid
-          ;; (and (numberp match-beg) (<= match-beg total-length ))
-          t
-          )
-         (arguments-end (if valid match-beg 0))
-         (return-type-begin arguments-end)
-         (raw-args (substring function-type 0 arguments-end))
-         (args
-          (if (string= raw-args "Void")
-              ;; Force Haxe function hints to always
-              ;; display with () parenthesis directly after the function name.
-              "()"
-            raw-args))
-         (return-type (substring function-type return-type-begin)))
-    (cons args return-type)))
 
 (defun battle-haxe-set-string-face (face string)
   "Helper to color STRING according to FACE."
@@ -763,13 +738,13 @@ If nothing found to fetch type information to, do nothing."
                 (is-function? (alist-get 'is-function? function-xml-details))
                 (node-name (xml-node-name (xml-node-children (xml-node-name root))))
                 (signature (battle-haxe-first-real-line-of node-name))
-                (signature-parts (battle-haxe-eldoc-detect-signature-parts signature))
+                (signature-parts (battle-haxe-detect-signature-parts signature))
                 (args (alist-get 'args signature-parts))
-                (returnval (alist-get 'returnval signature-parts)))
+                (return-val (alist-get 'return-val signature-parts)))
              (if name
                  (eldoc-message
                   (if is-function?
-                      (concat name args " : " returnval)
+                      (concat name args " : " return-val)
                     (concat
                      name " : " signature))))))))))
 
@@ -787,11 +762,10 @@ such as @position."
               3
               pos-string)))
 
-
-(defun battle-haxe-eldoc-detect-signature-parts (signature-string)
+(defun battle-haxe-detect-signature-parts (signature-string)
   "Break down SIGNATURE-STRING into args, and return value.
 If not a function signature, the output 'args will be empty,
-and the 'returnval will be the full signature."
+and the 'return-val will be the full signature."
   (let ((len (length signature-string)))
     (with-temp-buffer
       (insert signature-string)
@@ -803,7 +777,7 @@ and the 'returnval will be the full signature."
           (progn
             (goto-char (scan-sexps (point) 1))
             (let* ((args (substring (buffer-string) 0 (- (point) 1)))
-                   (returnval (first
+                   (return-val (first
                                (battle-haxe-string-regex-results
                                 "-> \\(.*\\)"
                                 1
@@ -812,11 +786,13 @@ and the 'returnval will be the full signature."
                                            len))))
                    (fixed-args (if (string= args "Void") "()" args)))
               (list
+               (cons 'is-method t)
                (cons 'args fixed-args)
-               (cons 'returnval returnval))))
+               (cons 'return-val return-val))))
         (list
+         (cons 'is-method nil)
          (cons 'args "")
-         (cons 'returnval signature-string))))))
+         (cons 'return-val signature-string))))))
 
 (defun battle-haxe-is-invalid-pos-string (pos-string)
   "Check if this POS-STRING is actually a returned error message from the server."
