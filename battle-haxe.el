@@ -578,8 +578,8 @@ Optionally provide a DEFAULT-VALUE if not found."
   (let* ((type (get-text-property 0 'type name))
          (parts (battle-haxe-detect-signature-parts type))
          (return-type (alist-get 'return-val parts))
-         (is-method (alist-get 'is-method parts)))
-    (if is-method
+         (is-function (alist-get 'is-function parts)))
+    (if is-function
         (concat
          " : "
          return-type
@@ -787,11 +787,11 @@ and the 'return-val will be the full signature."
                                            len))))
                    (fixed-args (if (string= args "Void") "()" args)))
               (list
-               (cons 'is-method t)
+               (cons 'is-function t)
                (cons 'args fixed-args)
                (cons 'return-val return-val))))
         (list
-         (cons 'is-method nil)
+         (cons 'is-function nil)
          (cons 'args "")
          (cons 'return-val signature-string))))))
 
@@ -1067,14 +1067,14 @@ Choosing between the results is done with helm."
 (defun battle-haxe-perform-result-expansion (candidate)
   "Called after CANDIDATE is inserted.
 Either insert interactively using yasnippet,
-Or insert regularly, but without any method arg list."
+Or insert regularly, but without any function arg list."
   (delete-region (- (point) (length candidate)) (point))
   (let* ((split (battle-haxe-split-candidate candidate))
          (use-yasnippet (and
                          battle-haxe-yasnippet-completion-expansion
                          (bound-and-true-p yas-minor-mode)
                          ;; Only for functions
-                         (alist-get 'args split))))
+                         (alist-get 'is-function split))))
     (if use-yasnippet
         (yas-expand-snippet (battle-haxe-make-yasnippet-template split))
       (insert (alist-get 'name split)))))
@@ -1082,19 +1082,23 @@ Or insert regularly, but without any method arg list."
 (defun battle-haxe-split-candidate (candidate)
   "Split CANDIDATE to a name, and a list of arguments (if any)."
   (let* ((name (first (battle-haxe-string-regex-results (concat "\\("battle-haxe-symbol-chars"*\\).*") 1 candidate)))
-         (is-method (cl-search "(" candidate))
+         (is-function (cl-search "(" candidate))
          (args-str-raw
-          (and is-method
+          (and is-function
                (battle-haxe-string-regex-results (concat ""battle-haxe-symbol-chars"*\(\\(.*\\)\)") 1 candidate)))
          (args-str (if args-str-raw (first args-str-raw) ""))
          (args nil))
     ;; Arguments
-    (setq args
-          (-map (lambda (arg)
-                  (substring arg 0
-                             (string-match battle-haxe-non-symbol-chars arg)))
-                (split-string args-str ", " ",")))
+    (when is-function
+      (let ((arg-strings (split-string args-str ", " ",")))
+        (setq args
+              (-map (lambda (arg)
+                      (substring arg 0
+                                 (string-match battle-haxe-non-symbol-chars arg)))
+                    arg-strings))))
+    
     (list
+     (cons 'is-function is-function)
      (cons 'name name)
      (cons 'args args))))
 
