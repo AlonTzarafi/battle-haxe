@@ -34,7 +34,7 @@ The main quirk is that the system has to force automatic saving of the edited Ha
 
 * Installation
 - *First install the following packages which are required as dependencies:*
-  - ~company~, ~helm~, ~async~, ~dash~, ~f~, ~s~
+  - ~company~, ~helm~, ~async~, ~dash~, ~dash-functional~, ~f~, ~s~
   - optional dependency: ~yasnippet~
 - *Download this package and add it to your load path, for example:*
 #+begin_src elisp
