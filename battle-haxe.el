@@ -76,8 +76,8 @@ Used to determine if a new call to Haxe compiler services is needed.")
 (defvar-local battle-haxe-cached-completion-response nil
   "Buffer-local saved copy of last company completion server response.")
 
-(defvar-local battle-haxe-current-completions-parser #'battle-haxe-general-completions-from-xml
-  "Buffer-local current completions-parser function.")
+(defvar-local battle-haxe-current-completions-node-processor #'battle-haxe-type-completion-general-node-processor
+  "Buffer-local current node-processor function.")
 
 (defconst battle-haxe-symbol-chars "[[:alnum:]?_]"
   "Characters allowed in Haxe symbol names.")
@@ -155,8 +155,8 @@ Used to determine if a new call to Haxe compiler services is needed.")
 
 (defun battle-haxe-get-company-prefix ()
   "Get the prefix for a company completion.
-Tries to determine the type of the prefix.
-Embeds the `completions-parser' associated with this type in a text property."
+Also, try to determine the type of the prefix.
+The variable `battle-haxe-current-completions-node-processor' is set accordingly."
   (let*
       ((prefix-text nil)
        (is-done? nil)
@@ -176,11 +176,14 @@ Embeds the `completions-parser' associated with this type in a text property."
     ;; Tag prefix with completion type:
     (cond
      (inserted-member
-      (setq battle-haxe-current-completions-parser #'battle-haxe-member-completions-from-xml))
+      (setq battle-haxe-current-completions-node-processor
+            #'battle-haxe-member-completion-xml-node-processor))
      (inserted-type
-      (setq battle-haxe-current-completions-parser #'battle-haxe-type-completions-from-xml))
+      (setq battle-haxe-current-completions-node-processor
+            #'battle-haxe-type-completion-xml-node-processor))
      ((and inserted-general-symbol (not (string-empty-p inserted-general-symbol)))
-      (setq battle-haxe-current-completions-parser #'battle-haxe-general-completions-from-xml)))
+      (setq battle-haxe-current-completions-node-processor
+            #'battle-haxe-type-completion-general-node-processor)))
     
     (or prefix-text
         ;; This disallows other company backends to run on the code:
@@ -251,25 +254,22 @@ Send nil if nothing to complete."
         (battle-haxe-company-candidates
          haxe-point
          ""
-         battle-haxe-current-completions-parser
          prefix))
     nil))
 
-(defun battle-haxe-company-candidates (haxe-point haxe-compiler-service completions-parser inserted-text)
+(defun battle-haxe-company-candidates (haxe-point haxe-compiler-service inserted-text)
   "Return a company completion with the given parameters.
 HAXE-POINT is the haxe-point.
 HAXE-COMPILER-SERVICE is haxe compiler services mode (example: '@type').
 It can also be an empty string and haxe will still provide contextual
 completions in the provided point.
-COMPLETIONS-PARSER is a function that transforms the XML result string
-into candidates.
 INSERTED-TEXT is sent to the parser to help match some candidates.
 If a cache is valid, return it right away, else return async candidates."
   (let ((process-result
          (lambda (xml-str)
            ;; When it will get server results:
            (-filter (-not #'string-empty-p)
-                    (funcall completions-parser xml-str inserted-text))))
+                    (battle-haxe-parse-completions-from-xml xml-str inserted-text))))
         (use-cached (alist-get 'approved battle-haxe-cached-completion-context)))
     (if use-cached
         (funcall process-result battle-haxe-cached-completion-response)
@@ -437,43 +437,10 @@ the COMPILER-SERVICES-MODE is appended to the haxe-point in the --display argume
           (ignore-errors
             (xml-parse-region (point-min) (point-max)))))))
 
-(defun battle-haxe-member-completions-from-xml (xml-str inserted-text)
+(defun battle-haxe-parse-completions-from-xml (xml-str inserted-text)
   "Parse the XML-STR string returned from the Haxe server.
-Combine with the INSERTED-TEXT at the completion point,
-to produce member completion candidates.
-
-This function assumes it will get a member completion list."
-  (battle-haxe-completions-from-xml-common
-   xml-str
-   #'battle-haxe-member-completion-xml-node-processor
-   inserted-text))
-
-(defun battle-haxe-type-completions-from-xml (xml-str inserted-text)
-  "Parse the XML-STR string returned from the Haxe server.
-Combine with the INSERTED-TEXT at the completion point,
-to produce type completion candidates.
-
-This function assumes it will get a type completion list."
-  (battle-haxe-completions-from-xml-common
-   xml-str
-   #'battle-haxe-type-completion-xml-node-processor
-   inserted-text))
-
-(defun battle-haxe-general-completions-from-xml (xml-str inserted-text)
-  "Parse the XML-STR string returned from the Haxe server.
-Combine with the INSERTED-TEXT at the completion point,
-to produce type completion candidates.
-
-This function doesn't assume what it will get."
-  (battle-haxe-completions-from-xml-common
-   xml-str
-   #'battle-haxe-type-completion-general-node-processor
-   inserted-text))
-
-(defun battle-haxe-completions-from-xml-common (xml-str completion-node-processor inserted-text)
-  "Parse the XML-STR string returned from the Haxe server.
-Use COMPLETION-NODE-PROCESSOR on each child node of the XML.
-Send INSERTED-TEXT to the node processor to help match candidtes.
+Send all nodes to the current node processor to add meta-data.
+Also send INSERTED-TEXT to the node processor to help match candidtes.
 Sort the candidates according to those matches.
 The result is the full list of processed completion candidates."
   (let*
@@ -481,7 +448,7 @@ The result is the full list of processed completion candidates."
        (completion-xml-nodes (xml-get-children (car xml-root) 'i))
        (calc-completion-xml-node
         (lambda (xml-node)
-          (funcall completion-node-processor xml-node inserted-text)))
+          (funcall battle-haxe-current-completions-node-processor xml-node inserted-text)))
        (completions-processed
         (mapcar calc-completion-xml-node completion-xml-nodes))
        (completions-filtered
