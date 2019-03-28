@@ -279,9 +279,14 @@ Send nil if nothing to complete."
   (let*
       ((is-done? nil)
        
+       ;; Check if it's pretty clear you're inserting a member
        (inserted-member (unless is-done? (battle-haxe-inserted-member)))
        (is-done? (or is-done? inserted-member))
+       ;; Check if it's pretty clear you're inserting a typed
        (inserted-type (unless is-done? (battle-haxe-inserted-type)))
+       (is-done? (or is-done? inserted-type))
+       ;; A more general test follows:
+       (inserted-general-symbol (unless is-done? (battle-haxe-inserted-symbol)))
        (is-done? (or is-done? inserted-type))
        
        (completions-parser nil)
@@ -303,6 +308,13 @@ Send nil if nothing to complete."
             (setq inserted-text inserted-type)
             ;; (setq haxe-compiler-services-mode "@type")
             'complete-member-or-type))
+         ((and inserted-general-symbol (not (string-empty-p inserted-general-symbol)))
+          (progn
+            (setq completions-parser #'battle-haxe-general-completions-from-xml)
+            (setq inserted-text inserted-general-symbol)
+            ;; (setq haxe-compiler-services-mode "@position")
+            'complete-member-or-type)
+          )
          (t 'none))))
 
     is-done?                          ;Yeah... It's done
@@ -434,7 +446,9 @@ the COMPILER-SERVICES-MODE is appended to the haxe-point in the --display argume
 (defun battle-haxe-member-completions-from-xml (xml-str inserted-text)
   "Parse the XML-STR string returned from the Haxe server.
 Combine with the INSERTED-TEXT at the completion point,
-to produce member completion candidates."
+to produce member completion candidates.
+
+This function assumes it will get a member completion list."
   (battle-haxe-completions-from-xml-common
    xml-str
    #'battle-haxe-member-completion-xml-node-processor
@@ -443,10 +457,23 @@ to produce member completion candidates."
 (defun battle-haxe-type-completions-from-xml (xml-str inserted-text)
   "Parse the XML-STR string returned from the Haxe server.
 Combine with the INSERTED-TEXT at the completion point,
-to produce type completion candidates."
+to produce type completion candidates.
+
+This function assumes it will get a type completion list."
   (battle-haxe-completions-from-xml-common
    xml-str
    #'battle-haxe-type-completion-xml-node-processor
+   inserted-text))
+
+(defun battle-haxe-general-completions-from-xml (xml-str inserted-text)
+  "Parse the XML-STR string returned from the Haxe server.
+Combine with the INSERTED-TEXT at the completion point,
+to produce type completion candidates.
+
+This function doesn't assume what it will get."
+  (battle-haxe-completions-from-xml-common
+   xml-str
+   #'battle-haxe-type-completion-general-node-processor
    inserted-text))
 
 (defun battle-haxe-completions-from-xml-common (xml-str completion-node-processor inserted-text)
@@ -503,22 +530,9 @@ The completion candidate is matched to INSERTED-TEXT."
        ;;                (error "Error. Couldn't parse completion node's name")))
        
        (docstring (car (cdr (cdr (nth 0 (xml-get-children completion-xml-node 'd))))))
-       (match (battle-haxe-calc-match inserted-text name))
-       ;;NOTE: change this if matching smartly to multiple sections
-       (matchbegin (car (first match)))
-       (matchlen
-        (if match
-            (- (cdr (first match)) (car (first match)))
-          0)
-        )
        (output
         name))
-    (battle-haxe-set-prop output 'kind kind)
-    (battle-haxe-set-prop output 'type type)
-    (battle-haxe-set-prop output 'docstring docstring)
-    (battle-haxe-set-prop output 'match match)
-    (battle-haxe-set-prop output 'matchlen matchlen)
-    (battle-haxe-set-prop output 'matchbegin matchbegin)
+    (battle-haxe-completion-node-common-props output kind type docstring inserted-text)
     output))
 
 (defun battle-haxe-type-completion-xml-node-processor (completion-xml-node inserted-text)
@@ -532,23 +546,58 @@ The completion candidate is matched to INSERTED-TEXT."
       ((competion-attrs (xml-node-attributes completion-xml-node))
        (name (car (xml-node-children
                    completion-xml-node)))
-       (kind "")
        (type (cdr (assoc 'p competion-attrs)))
        (ensure-import type)             ;Used later for auto-import
-       (docstring "")
-       (match (battle-haxe-calc-match inserted-text name))
-       (matchlen
-        (if match
-            (- (cdr (first match)) (car (first match)))
-          0))
        (output name))
-    (battle-haxe-set-prop output 'kind kind)
-    (battle-haxe-set-prop output 'type type)
     (battle-haxe-set-prop output 'ensure-import ensure-import)
-    (battle-haxe-set-prop output 'docstring docstring)
-    (battle-haxe-set-prop output 'match match)
-    (battle-haxe-set-prop output 'matchlen matchlen)
+    (battle-haxe-completion-node-common-props output "" type "" inserted-text)
     output))
+
+(defun battle-haxe-type-completion-general-node-processor (completion-xml-node inserted-text)
+  "The node processor for performing general completion.
+Take COMPLETION-XML-NODE,
+an individual result of compiler services member completion.
+Parse it and return a string of the candidate name,
+plus some meta-data as text properties.
+The completion candidate is matched to INSERTED-TEXT."
+  (when-let*
+      ((competion-attrs (xml-node-attributes completion-xml-node))
+       (name (car (xml-node-children
+                   completion-xml-node)))
+       (kind (cdr (assoc 'k competion-attrs)))
+       
+       ;; Save general type completions to explicit type input.
+       ;; Only allow local/member/literal completions here:
+       (is-valid (or (string= kind "local")
+                     (string= kind "member")
+                     (string= kind "literal")))
+       ;; Haxe literals are for example "true" "false"
+       
+       (type (or (cdr (assoc 't competion-attrs))
+                 ;; Make having a type attribute optional (for the special case of literals)
+                 ""))
+       (output name))
+    (battle-haxe-completion-node-common-props output kind type "" inserted-text)
+    output))
+
+(defun battle-haxe-completion-node-common-props (candidate kind type docstring inserted-text)
+  "Perform common tasks for all completion node types.
+Adds text properties to CANDIDATE.
+KIND, TYPE, DOCSTRING are simply added.
+INSERTED-TEXT is first used to match with the candidate."
+  (let* ((name candidate)
+         (match (battle-haxe-calc-match inserted-text name))
+         (matchbegin (car (first match)))
+         (matchlen
+          (if match
+              (- (cdr (first match)) (car (first match)))
+            0)))
+    (battle-haxe-set-prop candidate 'kind kind)
+    (battle-haxe-set-prop candidate 'type type)
+    (battle-haxe-set-prop candidate 'docstring docstring)
+    (battle-haxe-set-prop candidate 'match match)
+    (battle-haxe-set-prop candidate 'matchlen matchlen)
+    (battle-haxe-set-prop candidate 'matchbegin matchbegin)))
 
 (defun battle-haxe-set-prop (completion property value)
   "Put a text-property PROPERTY with value VALUE in string COMPLETION."
@@ -673,6 +722,19 @@ The colon is accepted as a prefix to a Haxe type (and completion can trigger)."
                 (match-string 1)
               nil)))))
     inserted-member))
+
+(defun battle-haxe-inserted-symbol ()
+  "Return a typed Haxe symbol, or nil if not detected to be typing."
+  (let ((inserted-symbol
+         (save-excursion
+           (if
+               (re-search-backward
+                (concat battle-haxe-non-symbol-chars"\\("battle-haxe-symbol-chars"*\\)\\=")
+                (line-beginning-position)
+                t)
+               (match-string 1)
+             nil))))
+    inserted-symbol))
 
 (defun battle-haxe-try-find-enclosing-function-call ()
   "Try to find the 'current' function call.
