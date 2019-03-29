@@ -122,7 +122,15 @@ Used to determine if a new call to Haxe compiler services is needed.")
      (if
          (and (bound-and-true-p battle-haxe-services-mode)
               (not (company-in-string-or-comment)))
-         (battle-haxe-get-company-prefix)
+         (let ((prefix (battle-haxe-get-company-prefix)))
+           (if (looking-back
+                (concat
+                 battle-haxe-non-symbol-chars"\\(using \\|import \\|new \\|.*[.:]\\)")
+                (- (point) (line-beginning-position)))
+               ;; When these options are found, trigger automatic compilation
+               (cons prefix t)
+             prefix))
+       
        ;; Allow other backends in strings and comments
        nil))
     
@@ -435,8 +443,7 @@ the COMPILER-SERVICES-MODE is appended to the haxe-point in the --display argume
       (with-temp-buffer
         (progn
           (insert xml-string)
-          (ignore-errors
-            (xml-parse-region (point-min) (point-max)))))))
+          (xml-parse-region (point-min) (point-max))))))
 
 (defun battle-haxe-parse-completions-from-xml (xml-str inserted-text)
   "Parse the XML-STR string returned from the Haxe server.
@@ -621,7 +628,7 @@ Optionally provide a DEFAULT-VALUE if not found."
          (save-excursion
            (if
                (re-search-backward
-                "\\(?:[.]\\|override \\)\\([[:alnum:]\\|_]*\\)\\="
+                (concat "\\(?:[.]\\|override \\)\\("battle-haxe-symbol-chars"*\\)\\=")
                 (line-beginning-position)
                 t)
                (match-string 1)
@@ -772,7 +779,9 @@ and the 'return-val will be the full signature."
       (insert signature-string)
       (goto-char 0)
       (if (or
-           (string= "(" (substring signature-string 0 1))
+           (and
+            (< 0 (length signature-string))
+            (string= "(" (substring signature-string 0 1)))
            (and (<= 5 len)
                 (string= "Void " (substring signature-string 0 5))))
           (progn
