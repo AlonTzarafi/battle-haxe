@@ -446,7 +446,8 @@ too many for the compiler services to function."
       (with-temp-buffer
         (progn
           (insert xml-string)
-          (xml-parse-region (point-min) (point-max))))))
+          (ignore-errors
+            (xml-parse-region (point-min) (point-max)))))))
 
 (defun battle-haxe-parse-completions-from-xml (xml-str inserted-text)
   "Parse the XML-STR string returned from the Haxe server.
