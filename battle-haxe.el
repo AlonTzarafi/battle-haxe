@@ -125,7 +125,7 @@ Used to determine if a new call to Haxe compiler services is needed.")
          (let ((prefix (battle-haxe-get-company-prefix)))
            (if (looking-back
                 (concat
-                 battle-haxe-non-symbol-chars"\\(using \\|import \\|new \\|.*[.:]\\)")
+                 battle-haxe-non-symbol-chars"\\(using \\|import \\|new \\|.*[.:<]\\)")
                 (- (point) (line-beginning-position)))
                ;; When these options are found, trigger automatic compilation
                (cons prefix t)
@@ -663,17 +663,18 @@ The colon is accepted as a prefix to a Haxe type (and completion can trigger)."
         (save-excursion
           (if
               (re-search-backward
-               "^[[:blank:]]*\\(?:default\\|case\\)\\(.*\\):\\="
+               ;; Find situations like "case 1:" to ignore them
+               "^[[:blank:]]*\\(?:default\\|case\\)\\( .*\\)?:\\="
                beg-of-line
                t)
               (match-string 1)
             nil)))
        (inserted-member
-        (unless is-switch-case-colon ;disable type-completion in situations like "case 1:"
+        (unless is-switch-case-colon
           (save-excursion
             (if
                 (re-search-backward
-                 "\\(?::\\|[^[:alnum:]]\\(?:new \\|import \\|using \\|\)\\)\\)\\([[:alnum:]\\|_]*\\)\\="
+                 "\\(?::\\|[<]\\|[^[:alnum:]]\\(?:new \\|import \\|using \\|\)\\)\\)\\([[:alnum:]\\|_]*\\)\\="
                  beg-of-line
                  t)
                 (match-string 1)
