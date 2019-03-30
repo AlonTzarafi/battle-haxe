@@ -30,15 +30,12 @@
 ;; The tools rely on the Haxe "compiler services" feature ( https://haxe.org/manual/cr-completion-overview.html ).
 ;; The main quirk is that the system has to force automatic saving of the edited Haxe buffer.
 ;; If this is a problem for you don't use the package.
-;; A `battle-haxe-syntax-mode' is supplied but it actually uses `js-mode' for syntax highlighting and indentation.
 ;; See the project home page for more information.
 
 ;;; Code:
 
 ;; For completion
 (require 'company)
-;; For syntax highlighting and indentation
-(require 'js)
 ;; For find references
 (require 'helm)
 ;; For non-blocking operations
@@ -90,10 +87,6 @@ Used to determine if a new call to Haxe compiler services is needed.")
   (let ((map (make-sparse-keymap)))
     map)
   "Keymap used for symbol `battle-haxe-services-mode'.")
-
-;;;###autoload
-(define-derived-mode battle-haxe-syntax-mode js-mode "Haxe"
-  "Haxe syntax highlighting mode. This is simply using js-mode for now.")
 
 ;;;###autoload
 (define-minor-mode battle-haxe-services-mode
