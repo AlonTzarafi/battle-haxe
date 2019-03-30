@@ -438,7 +438,10 @@ the COMPILER-SERVICES-MODE is appended to the haxe-point in the --display argume
       (concat "@" compiler-services-mode))))))
 
 (defun battle-haxe-get-xml-root (xml-string)
-  "Get a root XML object from the provided XML-STRING."
+  "Get a root XML object from the provided XML-STRING.
+If XML-STRING is not a valid XML it will fail to parse and will return nil.
+Haxe returns a non-XML only when there's too severe errors,
+too many for the compiler services to function."
   (if (stringp xml-string)
       (with-temp-buffer
         (progn
@@ -453,6 +456,7 @@ Sort the candidates according to those matches.
 The result is the full list of processed completion candidates."
   (let*
       ((xml-root (battle-haxe-get-xml-root xml-str))
+       (is-error-response (not xml-root))
        (completion-xml-nodes (xml-get-children (car xml-root) 'i))
        (calc-completion-xml-node
         (lambda (xml-node)
@@ -472,7 +476,16 @@ The result is the full list of processed completion candidates."
                                (- (battle-haxe-get-prop b 'matchlen 0)
                                   (* 0.001 (battle-haxe-get-prop b 'matchbegin 0)))))))
        (completions completions-sorted))
-    completions))
+    (if is-error-response
+        (progn
+          (run-at-time
+           "100 millisecond"
+           nil
+           (lambda ()
+             (message "Haxe completion failed. Haxe returned:\n%s" xml-str)))
+          ;; Notify user but don't error:
+          nil)
+      completions)))
 
 (defun battle-haxe-member-completion-xml-node-processor (completion-xml-node inserted-text)
   "The node processor for performing member completion.
