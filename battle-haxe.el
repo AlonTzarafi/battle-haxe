@@ -787,35 +787,40 @@ such as @position."
   "Break down SIGNATURE-STRING into args, and return value.
 If not a function signature, the output 'args will be empty,
 and the 'return-val will be the full signature."
-  (let ((len (length signature-string)))
-    (with-temp-buffer
-      (insert signature-string)
-      (goto-char 0)
-      (if (or
-           (and
-            (< 0 (length signature-string))
-            (string= "(" (substring signature-string 0 1)))
-           (and (<= 5 len)
-                (string= "Void " (substring signature-string 0 5))))
-          (progn
-            (goto-char (scan-sexps (point) 1))
-            (let* ((args (substring (buffer-string) 0 (- (point) 1)))
-                   (return-val (first
-                               (battle-haxe-string-regex-results
-                                "-> \\(.*\\)"
-                                1
-                                (substring (buffer-string)
-                                           (min (point) len)
-                                           len))))
-                   (fixed-args (if (string= args "Void") "()" args)))
-              (list
-               (cons 'is-function t)
-               (cons 'args fixed-args)
-               (cons 'return-val return-val))))
-        (list
-         (cons 'is-function nil)
-         (cons 'args "")
-         (cons 'return-val signature-string))))))
+  (if signature-string
+      (let ((len (length signature-string)))
+        (with-temp-buffer
+          (insert signature-string)
+          (goto-char 0)
+          (if (or
+               (and
+                (< 0 (length signature-string))
+                (string= "(" (substring signature-string 0 1)))
+               (and (<= 5 len)
+                    (string= "Void " (substring signature-string 0 5))))
+              (progn
+                (goto-char (scan-sexps (point) 1))
+                (let* ((args (substring (buffer-string) 0 (- (point) 1)))
+                       (return-val (first
+                                    (battle-haxe-string-regex-results
+                                     "-> \\(.*\\)"
+                                     1
+                                     (substring (buffer-string)
+                                                (min (point) len)
+                                                len))))
+                       (fixed-args (if (string= args "Void") "()" args)))
+                  (list
+                   (cons 'is-function t)
+                   (cons 'args fixed-args)
+                   (cons 'return-val return-val))))
+            (list
+             (cons 'is-function nil)
+             (cons 'args "")
+             (cons 'return-val signature-string)))))
+    (list
+     (cons 'is-function nil)
+     (cons 'args "")
+     (cons 'return-val "(NOT FOUND)"))))
 
 (defun battle-haxe-is-invalid-pos-string (pos-string)
   "Check if this POS-STRING is actually a returned error message from the server."
