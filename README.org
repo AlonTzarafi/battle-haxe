@@ -74,8 +74,8 @@ but here is a template "some-project.hxml" to get you started for this use case:
 * Notes
 - This package is intended to support only the latest and greatest Haxe compiler version (currently =4.0.0-rc.1=).
 - There is no real syntax highlighting/indentation mode included.
-  However the =js-mode= does a good enough job with most Haxe code that it's less urgent to create a specialized mode.
-  The =use-package= block for =haxe-mode= (really =js-mode=) is good for things such as =yasnippet= saving your snippets under "haxe-mode".
+  However the =js-mode= (that drives the =haxe-mode=) does a good enough job with most Haxe code that it's less urgent to create a specialized mode.
+  The =use-package= block for defining =haxe-mode= is good for things such as =yasnippet= saving your snippets under a predictable "haxe-mode" folder.
 
 * Package naming
 I just found it funny that the language's creator gave it the name "Haxe" but pronounces it as "Axe".

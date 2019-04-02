@@ -546,6 +546,7 @@ The completion candidate is matched to INSERTED-TEXT."
        ;; Only allow local/member/literal completions here:
        (is-valid (or (string= kind "local")
                      (string= kind "member")
+                     (string= kind "static")
                      (string= kind "literal")))
        ;; Haxe literals are for example "true" "false"
        
