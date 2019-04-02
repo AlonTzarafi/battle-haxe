@@ -59,7 +59,8 @@ The main quirk is that the system has to force automatic saving of the edited Ha
          ("<f4>" . #'battle-haxe-goto-definition)
          ("<f12>" . #'battle-haxe-helm-find-references))
   :custom
-  (battle-haxe-yasnippet-completion-expansion t "Keep this if you want yasnippet to expand completions."))
+  (battle-haxe-yasnippet-completion-expansion t "Keep this if you want yasnippet to expand completions.")
+  (battle-haxe-immediate-completion t "Keep this if you want to immediately trigger completion when typing '.' and other relevant prefixes."))
 #+end_src
 - Customize this as you will.
 * Lime/OpenFL projects

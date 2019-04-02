@@ -54,6 +54,15 @@
 (defvar battle-haxe-yasnippet-completion-expansion nil
   "When non-nil, battle-haxe will expand completions using yasnippet when available.")
 
+(defvar battle-haxe-immediate-completion t
+  "When non-nil, battle-haxe will immediately start completions in some cases.
+Otherwise, completion only ever starts as configured in `company-mode' settings.
+Example cases for immediate completions (the '|' symbol is the current point):
+new |
+import |
+myObject.|
+var x:|")
+
 (defvar battle-haxe-cwd nil
   "Current working directory, or current project folder to pass to Haxe.")
 
@@ -110,7 +119,7 @@ Used to determine if a new call to Haxe compiler services is needed.")
   
   (cl-case command
     (interactive (company-begin-backend #'battle-haxe-company-backend))
-
+    
     (prefix
      (if
          (and (bound-and-true-p battle-haxe-services-mode)
@@ -118,12 +127,13 @@ Used to determine if a new call to Haxe compiler services is needed.")
          (let ((prefix (battle-haxe-get-company-prefix)))
            (if (looking-back
                 (concat
-                 battle-haxe-non-symbol-chars"\\(using \\|import \\|new \\|.*[.:<]\\)")
+                 "\\(?:"battle-haxe-non-symbol-chars"\\(using \\|import \\|new \\)""\\|[.:<]\\)")
                 (- (point) (line-beginning-position)))
-               ;; When these options are found, trigger automatic compilation
-               (cons prefix t)
+               ;; Only when these options are found, immediate compilation can trigger.
+               (if battle-haxe-immediate-completion
+                   (cons prefix t)
+                 prefix)
              prefix))
-       
        ;; Allow other backends in strings and comments
        nil))
     
