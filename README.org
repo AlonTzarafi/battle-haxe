@@ -34,8 +34,7 @@ The main quirk is that the system has to force automatic saving of the edited Ha
 
 * Installation
 - *First install the following packages which are required as dependencies:*
-  - ~company~, ~helm~, ~async~, ~dash~, ~dash-functional~, ~f~, ~s~
-  - optional dependency: ~yasnippet~
+  - ~company~, ~helm~, ~yasnippet~, ~async~, ~dash~, ~dash-functional~, ~f~, ~s~
 - *Download this package and add it to your load path, for example:*
 #+begin_src elisp
 ;; Tell Emacs where your elisp library sits
@@ -60,7 +59,7 @@ The main quirk is that the system has to force automatic saving of the edited Ha
          ("<f12>" . #'battle-haxe-helm-find-references))
   :custom
   (battle-haxe-yasnippet-completion-expansion t "Keep this if you want yasnippet to expand completions.")
-  (battle-haxe-immediate-completion t "Keep this if you want to immediately trigger completion when typing '.' and other relevant prefixes."))
+  (battle-haxe-immediate-completion nil "Toggle this if you want to immediately trigger completion when typing '.' and other relevant prefixes."))
 #+end_src
 - Customize this as you will.
 * Lime/OpenFL projects
@@ -74,9 +73,9 @@ but here is a template "some-project.hxml" to get you started for this use case:
 
 * Notes
 - This package is intended to support only the latest and greatest Haxe compiler version (currently =4.0.0-rc.1=).
-- There is no real syntax highlighting/indentation mode included.
+- There is no haxe-specific syntax highlighting/indentation mode included.
   However the =js-mode= (that drives the =haxe-mode=) does a good enough job with most Haxe code that it's less urgent to create a specialized mode.
-  The =use-package= block for defining =haxe-mode= is good for things such as =yasnippet= saving your snippets under a predictable "haxe-mode" folder.
+  The =use-package= block for defining a =haxe-mode= is useful for things such as =yasnippet= storing your snippets under a predictable "haxe-mode" folder.
 
 * Package naming
 I just found it funny that the language's creator gave it the name "Haxe" but pronounces it as "Axe".

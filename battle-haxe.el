@@ -5,7 +5,7 @@
 ;; Author: Alon Tzarafi  <alontzarafi@gmail.com>
 ;; URL: https://github.com/AlonTzarafi/battle-haxe
 ;; Version: 1.0
-;; Package-Requires: ((emacs "25") (company "0.9.9") (helm "3.0") (async "1.9.3") (cl-lib "0.5") (dash "2.12.0") (dash-functional "1.2.0") (s "1.10.0") (f "0.19.0"))
+;; Package-Requires: ((emacs "25") (company "0.9.9") (helm "3.0") (yasnippet "0.13.0") (async "1.9.3") (cl-lib "0.5") (dash "2.12.0") (dash-functional "1.2.0") (s "1.10.0") (f "0.19.0"))
 ;; Keywords: programming, languages, completion
 
 ;; battle-haxe is free software; you can redistribute it and/or modify it
@@ -38,6 +38,8 @@
 (require 'company)
 ;; For find references
 (require 'helm)
+;; For function call snippets
+(require 'yasnippet)
 ;; For non-blocking operations
 (require 'async)
 ;; For helper functions
@@ -162,41 +164,24 @@ Used to determine if a new call to Haxe compiler services is needed.")
      ;; After "new MyClass()" completion also auto-import it
      (battle-haxe-ensure-object-at-point-is-imported (battle-haxe-get-prop arg 'ensure-import))
      ;; Finalize inserted text
-     (battle-haxe-perform-result-expansion arg)))
-  )
+     (battle-haxe-perform-result-expansion arg))))
 
 (defun battle-haxe-get-company-prefix ()
   "Get the prefix for a company completion.
-Also, try to determine the type of the prefix.
-The variable `battle-haxe-current-completions-node-processor' is set accordingly."
-  (let*
-      ((prefix-text nil)
-       (is-done? nil)
-       
-       ;; Check if it's pretty clear you're inserting a member
-       (inserted-member (unless is-done? (setq prefix-text (battle-haxe-get-prefix-member))))
-       (is-done? (or is-done? inserted-member))
-       ;; Check if it's pretty clear you're inserting a typed
-       (inserted-type (unless is-done? (setq prefix-text (battle-haxe-get-prefix-type))))
-       (is-done? (or is-done? inserted-type))
-       ;; A more general test follows:
-       (inserted-general-symbol (unless is-done? (setq prefix-text (battle-haxe-get-prefix-any-symbol))))
-       (is-done? (or is-done? inserted-type)))
-    
-    is-done?                          ;Yeah... It's done
-    
-    ;; Tag prefix with completion type:
-    (cond
-     (inserted-member
-      (setq battle-haxe-current-completions-node-processor
-            #'battle-haxe-member-completion-xml-node-processor))
-     (inserted-type
-      (setq battle-haxe-current-completions-node-processor
-            #'battle-haxe-type-completion-xml-node-processor))
-     ((and inserted-general-symbol (not (string-empty-p inserted-general-symbol)))
-      (setq battle-haxe-current-completions-node-processor
+The variable `battle-haxe-current-completions-node-processor' is
+set according to the determined type of the prefix."
+  (let ((prefix-text))
+    (setq battle-haxe-current-completions-node-processor
+          (cond
+           ;; inserting a member?
+           ((setq prefix-text (battle-haxe-get-prefix-member))
+            #'battle-haxe-member-completion-xml-node-processor)
+           ;; inserting a type?
+           ((setq prefix-text (battle-haxe-get-prefix-type))
+            #'battle-haxe-type-completion-xml-node-processor)
+           ;; inserting something more general?
+           ((setq prefix-text (battle-haxe-get-prefix-any-symbol))
             #'battle-haxe-type-completion-general-node-processor)))
-    
     (or prefix-text
         ;; This disallows other company backends to run on the code:
         t)))
@@ -221,7 +206,7 @@ Sends PREFIX to the function `battle-haxe-compute-candidates'"
                           (and
                            ;; same hash
                            (string= rest-hash (alist-get 'rest-hash current))
-                           ;; ensure the saved line in scope
+                           ;; ensure the saved line is in scope
                            (>= (- (point) (line-beginning-position)) (length line-str))
                            ;; same initial part of line
                            (eq 0 (cl-search line-str (alist-get 'line-str current))))))))
@@ -468,7 +453,7 @@ The result is the full list of processed completion candidates."
        (completions-processed
         (mapcar calc-completion-xml-node completion-xml-nodes))
        (completions-filtered
-        (seq-filter #'stringp completions-processed))
+        (-filter #'stringp completions-processed))
        (completions-sorted (sort
                             completions-filtered
                             (lambda (a b)
@@ -552,8 +537,8 @@ The completion candidate is matched to INSERTED-TEXT."
                    completion-xml-node)))
        (kind (cdr (assoc 'k competion-attrs)))
        
-       ;; Save general type completions to explicit type input.
-       ;; Only allow local/member/literal completions here:
+       ;; Save type-completions only for explicit type-completion processor.
+       ;; Here only allow local/member/literal completions:
        (is-valid (or (string= kind "local")
                      (string= kind "member")
                      (string= kind "static")
@@ -574,10 +559,10 @@ KIND, TYPE, DOCSTRING are simply added.
 INSERTED-TEXT is first used to match with the candidate."
   (let* ((name candidate)
          (match (battle-haxe-calc-match inserted-text name))
-         (matchbegin (car (first match)))
+         (matchbegin (car (cl-first match)))
          (matchlen
           (if match
-              (- (cdr (first match)) (car (first match)))
+              (- (cdr (cl-first match)) (car (cl-first match)))
             0)))
     (battle-haxe-set-prop candidate 'kind kind)
     (battle-haxe-set-prop candidate 'type type)
@@ -906,8 +891,8 @@ The function goes to LINE and CHAR coordinates and tries to match REGEX."
         (delete-region (point-min) (point-max))
         (insert-file-contents filename)
         (goto-char 0)
-        (forward-line (decf line))
-        (forward-char (decf char))
+        (forward-line (cl-decf line))
+        (forward-char (cl-decf char))
         (let ((result
                (save-excursion
                  (re-search-forward regex nil t)
@@ -922,8 +907,8 @@ The result is a haxe-point that can be sent to Haxe compiler services."
     (insert-file-contents filename)
     
     (goto-char 0)
-    (forward-line (decf line))
-    (forward-char (decf char))
+    (forward-line (cl-decf line))
+    (forward-char (cl-decf char))
     (save-excursion
       (re-search-forward "\\([^( \t\n]*\\)" nil t))
     (concat filename (battle-haxe-get-haxe-point (point)))))
@@ -936,7 +921,7 @@ All of the matched results are returned as a list."
     (insert str)
     (goto-char 0)
     (re-search-forward regex nil t)
-    (map 'listp
+    (cl-map 'listp
        (lambda (n) (match-string n))
        (number-sequence 1 num-results))))
 
@@ -1035,8 +1020,8 @@ The function uses 'push-mark' to enable going back to the previous position."
       (push-mark)
       (find-file filename)
       (goto-char 0)
-      (forward-line (decf line))
-      (forward-char (decf char)))))
+      (forward-line (cl-decf line))
+      (forward-char (cl-decf char)))))
 
 (defun battle-haxe-helm-find-references ()
   "Ask Haxe for all references to symbol at point and prompt to visit one.
