@@ -67,6 +67,9 @@ import |
 myObject.|
 var x:|")
 
+(defvar battle-haxe-disallow-other-backends-in-strings-and-comments nil
+  "Allow other backends in strings and comments.")
+
 (defvar battle-haxe-cwd nil
   "Current working directory, or current project folder to pass to Haxe.")
 
@@ -125,21 +128,18 @@ Used to determine if a new call to Haxe compiler services is needed.")
     (interactive (company-begin-backend #'battle-haxe-company-backend))
     
     (prefix
-     (if
-         (and (bound-and-true-p battle-haxe-mode)
+     (if (and (bound-and-true-p battle-haxe-mode)
               (not (company-in-string-or-comment)))
          (let ((prefix (battle-haxe-get-company-prefix)))
-           (if (looking-back
-                (concat
-                 "\\(?:"battle-haxe-non-symbol-chars"\\(using \\|import \\|new \\)""\\|[.:<]\\)")
-                (- (point) (line-beginning-position)))
-               ;; Only when these options are found, immediate compilation can trigger.
-               (if battle-haxe-immediate-completion
-                   (cons prefix t)
-                 prefix)
-             prefix))
-       ;; Allow other backends in strings and comments
-       nil))
+           (or (when (looking-back
+                      (concat
+                       "\\(?:"battle-haxe-non-symbol-chars"\\(using \\|import \\|new \\)""\\|[.:<]\\)")
+                      (- (point) (line-beginning-position)))
+                 ;; Only when these options are found, immediate compilation can trigger.
+                 (when battle-haxe-immediate-completion
+                   (cons prefix t)))
+               prefix))
+       battle-haxe-disallow-other-backends-in-strings-and-comments))
     
     (candidates (battle-haxe-candidates arg))
     
@@ -227,34 +227,33 @@ Sends PREFIX to the function `battle-haxe-compute-candidates'"
   "Return the company candidates for use by the command `company-complete'.
 Reads completion type from PREFIX and tries to complete based on it.
 Send nil if nothing to complete."
-  (if (stringp prefix)
-      (let* ((inserted-member-begin (- (point) (length prefix)))
-             (haxe-point (battle-haxe-get-haxe-point inserted-member-begin)))
-        
-        ;; Final test of approval - same completion point
-        (if (alist-get 'approved battle-haxe-cached-completion-context)
-            (let ((completion-point-char (- inserted-member-begin (line-beginning-position)))
-                  (line-str-length (length (alist-get 'line-str battle-haxe-cached-completion-context))))
-              (unless (= completion-point-char line-str-length)
-                ;; Unapprove
-                (setq battle-haxe-cached-completion-context nil))))
-        
-        ;; Update the cache if any, to match only until completion point
-        (if battle-haxe-cached-completion-context
-            (add-to-list 'battle-haxe-cached-completion-context
-                         (cons 'line-str
-                               (buffer-substring-no-properties
-                                (line-beginning-position) inserted-member-begin))))
-        
-        ;; Let Haxe compiler read this file before proceeding to call the server
-        (unless (alist-get 'approved battle-haxe-cached-completion-context)
-          (battle-haxe-save-buffer-silently))
-        
-        (battle-haxe-company-candidates
-         haxe-point
-         ""
-         prefix))
-    nil))
+  (when (stringp prefix)
+    (let* ((inserted-member-begin (- (point) (length prefix)))
+           (haxe-point (battle-haxe-get-haxe-point inserted-member-begin)))
+      
+      ;; Final test of approval - same completion point
+      (when (alist-get 'approved battle-haxe-cached-completion-context)
+        (let ((completion-point-char (- inserted-member-begin (line-beginning-position)))
+              (line-str-length (length (alist-get 'line-str battle-haxe-cached-completion-context))))
+          (unless (= completion-point-char line-str-length)
+            ;; Unapprove
+            (setq battle-haxe-cached-completion-context nil))))
+      
+      ;; Update the cache if any, to match only until completion point
+      (when battle-haxe-cached-completion-context
+        (add-to-list 'battle-haxe-cached-completion-context
+                     (cons 'line-str
+                           (buffer-substring-no-properties
+                            (line-beginning-position) inserted-member-begin))))
+      
+      ;; Let Haxe compiler read this file before proceeding to call the server
+      (unless (alist-get 'approved battle-haxe-cached-completion-context)
+        (battle-haxe-save-buffer-silently))
+      
+      (battle-haxe-company-candidates
+       haxe-point
+       ""
+       prefix))))
 
 (defun battle-haxe-company-candidates (haxe-point haxe-compiler-service inserted-text)
   "Return a company completion with the given parameters.
@@ -295,7 +294,7 @@ The command is called in HAXE-POINT using the mode in HAXE-COMPILER-SERVICE."
 A so called haxe-point looks like this: path-to-file/Haxe-file.hx@bytepos
 The result is based either on FILENAME and TARGET-POINT,
 or, if they are nil, on the current buffer file and point."
-  (let ((target-point (or target-point (point) )))
+  (let ((target-point (or target-point (point))))
     (concat
      (or filename buffer-file-name)
      "@"
@@ -320,11 +319,11 @@ Haxe compiler services damands only byte position so some quirks must be handled
 (defun battle-haxe-file-has-BOM ()
   "Detect if current file has a byte order mark (BOM) at the beginning."
   (let ((filename buffer-file-name))
-    (if filename
-        (with-temp-buffer
-          (insert-file-contents-literally filename)
-          (let ((bom (decode-coding-string (buffer-substring-no-properties 1 4) 'utf-8)))
-            (string= bom (string ?\uFEFF)))))))
+    (when filename
+      (with-temp-buffer
+        (insert-file-contents-literally filename)
+        (let ((bom (decode-coding-string (buffer-substring-no-properties 1 4) 'utf-8)))
+          (string= bom (string ?\uFEFF)))))))
 
 (defun battle-haxe-ensure-object-at-point-is-imported (full-class-name)
   "Maybe add an import statement in the current buffer to the FULL-CLASS-NAME.
@@ -345,17 +344,17 @@ The Haxe compiler services is then called to indentify the class."
              (not is-imported)
              ;; and also not found by compiler services:
              (battle-haxe-is-invalid-pos-string (car (battle-haxe-position-query (battle-haxe-get-haxe-point)))))))
-      (if needs-to-be-imported
-          (save-excursion
-            (goto-char 0)
-            (while (re-search-forward "package[ \t[:alnum:]];" nil t))
-            (while (re-search-forward "import[ \t]+.+[ \t]*;" nil t))
-            (beginning-of-line)
-            (unless (equal (point-at-bol) (point-at-eol))
-              (forward-line))
-            (open-line 1)
-            (insert (concat "import " full-class-name ";"))
-            (message (concat "Class added to import list: " full-class-name)))))))
+      (when needs-to-be-imported
+        (save-excursion
+          (goto-char 0)
+          (while (re-search-forward "package[ \t[:alnum:]];" nil t))
+          (while (re-search-forward "import[ \t]+.+[ \t]*;" nil t))
+          (beginning-of-line)
+          (unless (equal (point-at-bol) (point-at-eol))
+            (forward-line))
+          (open-line 1)
+          (insert (concat "import " full-class-name ";"))
+          (message (concat "Class added to import list: " full-class-name)))))))
 
 (defun battle-haxe-get-line-and-hash-other-lines ()
   "Return an alist with 3 elements used to detect any change in buffer:
@@ -383,11 +382,12 @@ for starting a server based on the current buffer file's directory"
   (let ((dir (file-name-directory (or buffer-file-name "")))
         (candidates nil))
     (while (and dir (not (f-root-p dir)))
-      (if (not (file-remote-p dir))
-          (setq candidates
-                (append candidates
-                        (f-files dir (lambda (filename)
-                                       (string-match-p "\\.hxml$" filename))))))
+      (unless (file-remote-p dir)
+        (setq candidates
+              (append
+               candidates
+               (f-files dir (lambda (filename)
+                              (string-match-p "\\.hxml$" filename))))))
       (setq dir (f-parent dir)))
     
     (setq candidates (reverse candidates))
@@ -432,12 +432,12 @@ the COMPILER-SERVICES-MODE is appended to the haxe-point in the --display argume
 If XML-STRING is not a valid XML it will fail to parse and will return nil.
 Haxe returns a non-XML only when there's too severe errors,
 too many for the compiler services to function."
-  (if (stringp xml-string)
-      (with-temp-buffer
-        (progn
-          (insert xml-string)
-          (ignore-errors
-            (xml-parse-region (point-min) (point-max)))))))
+  (when (stringp xml-string)
+    (with-temp-buffer
+      (progn
+        (insert xml-string)
+        (ignore-errors
+          (xml-parse-region (point-min) (point-max)))))))
 
 (defun battle-haxe-parse-completions-from-xml (xml-str inserted-text)
   "Parse the XML-STR string returned from the Haxe server.
@@ -445,28 +445,27 @@ Send all nodes to the current node processor to add meta-data.
 Also send INSERTED-TEXT to the node processor to help match candidtes.
 Sort the candidates according to those matches.
 The result is the full list of processed completion candidates."
-  (let*
-      ((xml-root (battle-haxe-get-xml-root xml-str))
-       (is-error-response (not xml-root))
-       (completion-xml-nodes (xml-get-children (car xml-root) 'i))
-       (calc-completion-xml-node
-        (lambda (xml-node)
-          (funcall battle-haxe-current-completions-node-processor xml-node inserted-text)))
-       (completions-processed
-        (mapcar calc-completion-xml-node completion-xml-nodes))
-       (completions-filtered
-        (-filter #'stringp completions-processed))
-       (completions-sorted (sort
-                            completions-filtered
-                            (lambda (a b)
-                              ;; Mostly sort by match length,
-                              ;; but give priority to matches that match at an earlier point
-                              (>
-                               (- (battle-haxe-get-prop a 'matchlen 0)
-                                  (* 0.001 (battle-haxe-get-prop a 'matchbegin 0)))
-                               (- (battle-haxe-get-prop b 'matchlen 0)
-                                  (* 0.001 (battle-haxe-get-prop b 'matchbegin 0)))))))
-       (completions completions-sorted))
+  (let* ((xml-root (battle-haxe-get-xml-root xml-str))
+         (is-error-response (not xml-root))
+         (completion-xml-nodes (xml-get-children (car xml-root) 'i))
+         (calc-completion-xml-node
+          (lambda (xml-node)
+            (funcall battle-haxe-current-completions-node-processor xml-node inserted-text)))
+         (completions-processed
+          (mapcar calc-completion-xml-node completion-xml-nodes))
+         (completions-filtered
+          (-filter #'stringp completions-processed))
+         (completions-sorted (sort
+                              completions-filtered
+                              (lambda (a b)
+                                ;; Mostly sort by match length,
+                                ;; but give priority to matches that match at an earlier point
+                                (>
+                                 (- (battle-haxe-get-prop a 'matchlen 0)
+                                    (* 0.001 (battle-haxe-get-prop a 'matchbegin 0)))
+                                 (- (battle-haxe-get-prop b 'matchlen 0)
+                                    (* 0.001 (battle-haxe-get-prop b 'matchbegin 0)))))))
+         (completions completions-sorted))
     (if is-error-response
         (progn
           (run-at-time
@@ -485,26 +484,25 @@ an individual result of compiler services member completion.
 Parse it and return a string of the candidate name,
 plus some meta-data as text properties.
 The completion candidate is matched to INSERTED-TEXT."
-  (let*
-      ((competion-attrs (xml-node-attributes completion-xml-node))
-       (kind (cdr (assoc 'k competion-attrs)))
-       (type (or (car (cdr (cdr (nth 0 (xml-get-children completion-xml-node 't)))))
-                 ""))
+  (let* ((competion-attrs (xml-node-attributes completion-xml-node))
+         (kind (cdr (assoc 'k competion-attrs)))
+         (type (or (car (cdr (cdr (nth 0 (xml-get-children completion-xml-node 't)))))
+                   ""))
 
-       (parts (battle-haxe-detect-signature-parts type))
-       
-       (name (battle-haxe-set-string-face
-              'apropos-function-button
-              (concat
-               (cdr (assoc 'n competion-attrs))
-               (alist-get 'args parts))))
-       
-       ;; (error-check (unless (stringp name)
-       ;;                (error "Error. Couldn't parse completion node's name")))
-       
-       (docstring (car (cdr (cdr (nth 0 (xml-get-children completion-xml-node 'd))))))
-       (output
-        name))
+         (parts (battle-haxe-detect-signature-parts type))
+         
+         (name (battle-haxe-set-string-face
+                'apropos-function-button
+                (concat
+                 (cdr (assoc 'n competion-attrs))
+                 (alist-get 'args parts))))
+         
+         ;; (error-check (unless (stringp name)
+         ;;                (error "Error. Couldn't parse completion node's name")))
+         
+         (docstring (car (cdr (cdr (nth 0 (xml-get-children completion-xml-node 'd))))))
+         (output
+          name))
     (battle-haxe-completion-node-common-props output kind type docstring inserted-text)
     output))
 
@@ -515,13 +513,12 @@ an individual result of compiler services member completion.
 Parse it and return a string of the candidate name,
 plus some meta-data as text properties.
 The completion candidate is matched to INSERTED-TEXT."
-  (let*
-      ((competion-attrs (xml-node-attributes completion-xml-node))
-       (name (car (xml-node-children
-                   completion-xml-node)))
-       (type (cdr (assoc 'p competion-attrs)))
-       (ensure-import type)             ;Used later for auto-import
-       (output name))
+  (let* ((competion-attrs (xml-node-attributes completion-xml-node))
+         (name (car (xml-node-children
+                     completion-xml-node)))
+         (type (cdr (assoc 'p competion-attrs)))
+         (ensure-import type)             ;Used later for auto-import
+         (output name))
     (battle-haxe-set-prop output 'ensure-import ensure-import)
     (battle-haxe-completion-node-common-props output "" type "" inserted-text)
     output))
@@ -575,15 +572,14 @@ INSERTED-TEXT is first used to match with the candidate."
 
 (defun battle-haxe-set-prop (text property value)
   "Put a text-property PROPERTY with value VALUE in string TEXT."
-  (if (and text (not (string-empty-p text)))
-      (put-text-property 0 1 property value text)))
+  (when (and text (not (string-empty-p text)))
+    (put-text-property 0 1 property value text)))
 
 (defun battle-haxe-get-prop (text property &optional default-value)
   "Get a text-property PROPERTY in string TEXT.
 Optionally provide a DEFAULT-VALUE if not found."
-  (if-let (property (get-text-property 0 property text))
-      property
-    default-value))
+  (or (get-text-property 0 property text)
+      default-value))
 
 (defun battle-haxe-annotation (name)
   "Annotate a completion-candidate NAME accodring to the attached meta-data."
@@ -594,8 +590,7 @@ Optionally provide a DEFAULT-VALUE if not found."
     (if is-function
         (concat
          " : "
-         return-type
-         )
+         return-type)
       (concat ": " type))))
 
 (defun battle-haxe-set-string-face (face string)
@@ -605,24 +600,23 @@ Optionally provide a DEFAULT-VALUE if not found."
 
 (defun battle-haxe-docstring (name)
   "Fetch documentation string from completion candidate NAME's metadata."
-  (let
-      ((doc-buffer
-        (company-doc-buffer
-         (concat
-          (replace-regexp-in-string
-           ;;remove tabs and spaces at beginning of lines
-           "\n[\t ]+"
-           "\n"
+  (let ((doc-buffer
+         (company-doc-buffer
+          (concat
            (replace-regexp-in-string
-            ;; remove empty lines and whitespace before text
-            "\\`[ \t\n]*"
-            ""
-            (battle-haxe-get-prop name 'docstring "No documentation provided\n")))
-          
-          ;; Give extra character to buffer because popup window crops up my text :-/
-          ;; Take note: the following string isn't empty,
-          "⁣"                            ; <-- there is a unicode "INVISIBLE SEPARATOR" here
-          ))))
+            ;;remove tabs and spaces at beginning of lines
+            "\n[\t ]+"
+            "\n"
+            (replace-regexp-in-string
+             ;; remove empty lines and whitespace before text
+             "\\`[ \t\n]*"
+             ""
+             (battle-haxe-get-prop name 'docstring "No documentation provided\n")))
+           
+           ;; Give extra character to buffer because popup window crops up my text :-/
+           ;; Take note: the following string isn't empty,
+           "⁣"                            ; <-- there is a unicode "INVISIBLE SEPARATOR" here
+           ))))
     ;; (with-current-buffer doc-buffer
     ;;   (visual-line-mode))
     doc-buffer))
@@ -631,13 +625,11 @@ Optionally provide a DEFAULT-VALUE if not found."
   "Return a typed member name in a Haxe buffer, or nil if not typing a member."
   (let ((inserted-member
          (save-excursion
-           (if
-               (re-search-backward
-                (concat "\\(?:[.]\\|override \\)\\("battle-haxe-symbol-chars"*\\)\\=")
-                (line-beginning-position)
-                t)
-               (match-string 1)
-             nil))))
+           (when (re-search-backward
+                  (concat "\\(?:[.]\\|override \\)\\("battle-haxe-symbol-chars"*\\)\\=")
+                  (line-beginning-position)
+                  t)
+             (match-string 1)))))
     inserted-member))
 
 (defun battle-haxe-get-prefix-type ()
@@ -649,41 +641,34 @@ And in those cases their colon is ignored and doesn't count as a type prefix.
 However, in lines like this:
 function fun():
 The colon is accepted as a prefix to a Haxe type (and completion can trigger)."
-  (let*
-      ((beg-of-line (line-beginning-position))
-       (is-switch-case-colon
-        (save-excursion
-          (if
-              (re-search-backward
-               ;; Find situations like "case 1:" to ignore them
-               "^[[:blank:]]*\\(?:default\\|case\\)\\( .*\\)?:\\="
-               beg-of-line
-               t)
-              (match-string 1)
-            nil)))
-       (inserted-member
-        (unless is-switch-case-colon
+  (let* ((beg-of-line (line-beginning-position))
+         (is-switch-case-colon
           (save-excursion
-            (if
-                (re-search-backward
-                 "\\(?::\\|[<]\\|[^[:alnum:]]\\(?:new \\|import \\|using \\|\)\\)\\)\\([[:alnum:]\\|_]*\\)\\="
-                 beg-of-line
-                 t)
-                (match-string 1)
-              nil)))))
+            (when (re-search-backward
+                   ;; Find situations like "case 1:" to ignore them
+                   "^[[:blank:]]*\\(?:default\\|case\\)\\( .*\\)?:\\="
+                   beg-of-line
+                   t)
+              (match-string 1))))
+         (inserted-member
+          (unless is-switch-case-colon
+            (save-excursion
+              (when (re-search-backward
+                     "\\(?::\\|[<]\\|[^[:alnum:]]\\(?:new \\|import \\|using \\|\)\\)\\)\\([[:alnum:]\\|_]*\\)\\="
+                     beg-of-line
+                     t)
+                (match-string 1))))))
     inserted-member))
 
 (defun battle-haxe-get-prefix-any-symbol ()
   "Return a typed Haxe symbol, or nil if not detected to be typing."
   (let ((inserted-symbol
          (save-excursion
-           (if
-               (re-search-backward
-                (concat battle-haxe-non-symbol-chars"\\("battle-haxe-symbol-chars"*\\)\\=")
-                (line-beginning-position)
-                t)
-               (match-string 1)
-             nil))))
+           (when (re-search-backward
+                  (concat battle-haxe-non-symbol-chars"\\("battle-haxe-symbol-chars"*\\)\\=")
+                  (line-beginning-position)
+                  t)
+             (match-string 1)))))
     inserted-symbol))
 
 (defun battle-haxe-try-find-enclosing-function-call ()
@@ -691,37 +676,33 @@ The colon is accepted as a prefix to a Haxe type (and completion can trigger)."
 That is, the function/constructor you're currently writing arguments to.
 If found, return a buffer position that sits in the function/constructor's name.
 If no function call found, return current point."
-  (or (let*
-          ((pos-at-function
-            (save-excursion
-              (or
-               (re-search-backward
-                (concat "\\(\\)new \\("battle-haxe-symbol-chars"*\\)[[:space:]]*\([^(]*\\=")
-                (line-beginning-position)
-                t)
-               (if
-                   (re-search-backward
-                    (concat "\\("battle-haxe-symbol-chars"\\)[[:space:]]*[(][^(]*\\=")
-                    ;;TODO: Allow detection of multi-line function calls. Maybe use (backward-up-list) until hit a "("
-                    (line-beginning-position)
-                    t)
-                   (match-beginning 1)
-                 nil)))))
+  (or (let* ((pos-at-function
+              (save-excursion
+                (or
+                 (re-search-backward
+                  (concat "\\(\\)new \\("battle-haxe-symbol-chars"*\\)[[:space:]]*\([^(]*\\=")
+                  (line-beginning-position)
+                  t)
+                 (when (re-search-backward
+                        (concat "\\("battle-haxe-symbol-chars"\\)[[:space:]]*[(][^(]*\\=")
+                        ;;TODO: Allow detection of multi-line function calls. Maybe use (backward-up-list) until hit a "("
+                        (line-beginning-position)
+                        t)
+                   (match-beginning 1))))))
         pos-at-function)
       (point)))
 
 (defun battle-haxe-calc-match (inserted-text name)
   "Calculate the part of the INSERTED-TEXT that matchs NAME. Used for company candidates."
-  (if name
-      (let*
-          ((str-match (string-match inserted-text name 0))
+  (when name
+    (let* ((str-match (string-match inserted-text name 0))
            (mbeg (if str-match
                      (match-beginning 0)
                    0))
            (mend (if str-match
                      (match-end 0)
                    0)))
-        (list (cons mbeg mend)))))
+      (list (cons mbeg mend)))))
 
 (defun battle-haxe-save-buffer-silently ()
   "Save the buffer immediately before battle-haxe operations.
@@ -744,10 +725,8 @@ If nothing found to fetch type information to, do nothing."
     
     (battle-haxe-find-function-details
      (lambda (function-xml-details)
-       (if
-           function-xml-details
-           (let*
-               ((name (alist-get 'name function-xml-details))
+       (when function-xml-details
+         (let* ((name (alist-get 'name function-xml-details))
                 (root (alist-get 'xml-root function-xml-details))
                 (is-function? (alist-get 'is-function? function-xml-details))
                 (node-name (xml-node-name (xml-node-children (xml-node-name root))))
@@ -755,12 +734,12 @@ If nothing found to fetch type information to, do nothing."
                 (signature-parts (battle-haxe-detect-signature-parts signature))
                 (args (alist-get 'args signature-parts))
                 (return-val (alist-get 'return-val signature-parts)))
-             (if name
-                 (eldoc-message
-                  (if is-function?
-                      (concat name args " : " return-val)
-                    (concat
-                     name " : " signature))))))))))
+           (when name
+             (eldoc-message
+              (if is-function?
+                  (concat name args " : " return-val)
+                (concat
+                 name " : " signature))))))))))
 
 (defun battle-haxe-first-real-line-of (str)
   "Get the first non-empty line in STR."
@@ -817,77 +796,77 @@ and the 'return-val will be the full signature."
 
 (defun battle-haxe-is-invalid-pos-string (pos-string)
   "Check if this POS-STRING is actually a returned error message from the server."
-  (or (not pos-string) (cl-search "unknown" pos-string )))
+  (or (not pos-string) (cl-search "unknown" pos-string)))
 
 (defun battle-haxe-find-function-details (callback)
   "Calculate a cons result of (name . xml) about the current function.
 That is, the Haxe function you're currently typing or typing arguments to.
 The result will be returned to CALLBACK."
   (let ((function-info (battle-haxe-try-find-enclosing-function-call)))
-    (if function-info
-        (let* ((function-pos function-info)
-               (shell-cmd (battle-haxe-make-command-string
-                           (battle-haxe-get-haxe-point function-pos) "position")))
-          (async-start
-           `(lambda ()
-              (shell-command-to-string ,shell-cmd))
-           (lambda (haxe-@position-output)
-             (let ((pos-string (xml-node-name
-                                (xml-node-children
-                                 (nth 0
-                                      (xml-get-children
-                                       (xml-node-name (battle-haxe-get-xml-root
-                                                       haxe-@position-output))
-                                       'pos))))))
-               (if (battle-haxe-is-invalid-pos-string pos-string)
-                   (progn
-                     ;; (message
-                     ;;  (format
-                     ;;   "Couldn't find function position. Haxe returned this:\n%s"
-                     ;;   haxe-@position-output))
-                     nil)
-                 (when-let* ((parts (battle-haxe-get-pos-string-parts pos-string))
-                             (filename (alist-get 'file parts))
-                             (line-str (alist-get 'line parts))
-                             (char-str (alist-get 'char parts))
-                             (line (string-to-number line-str ))
-                             (char (string-to-number char-str )))
-                   (let* ((try-function-name (battle-haxe-get-regex-at-coordinates "\\([^( \t\n]*\\)" filename line char))
-                          (try-var-name (battle-haxe-get-regex-at-coordinates "\\([^: \t\n]*\\)" filename line char))
-                          (is-function? (< (length try-function-name) (length try-var-name)))
-                          (result-name)
-                          (result-xml-root)
-                          (haxe-point (battle-haxe-get-haxe-point-from-coordinates filename line char))
-                          (shell-cmd2 (battle-haxe-make-command-string haxe-point "type")))
-                     
-                     (async-start
-                      `(lambda ()
-                         (shell-command-to-string ,shell-cmd2))
-                      (lambda (haxe-@type-output)
-                        
-                        (setq result-name (if is-function?
-                                              try-function-name
-                                            try-var-name))
-                        (setq result-xml-root (battle-haxe-get-xml-root haxe-@type-output))
-                        
-                        ;; pass the final value:
-                        (funcall callback
-                                 (list
-                                  (cons 'name result-name)
-                                  (cons 'xml-root result-xml-root)
-                                  (cons 'is-function? is-function?)))))))))))
-          ;; Found something, and fetching data asynchronously, but return nil for now so eldoc doesn't launch yet
-          nil)
-      ;; Not on a function
-      nil)))
+    ;; If on a function
+    (when function-info
+      (let* ((function-pos function-info)
+             (shell-cmd (battle-haxe-make-command-string
+                         (battle-haxe-get-haxe-point function-pos) "position")))
+        (async-start
+         `(lambda ()
+            (shell-command-to-string ,shell-cmd))
+         (lambda (haxe-@position-output)
+           (let ((pos-string (xml-node-name
+                              (xml-node-children
+                               (nth 0
+                                    (xml-get-children
+                                     (xml-node-name (battle-haxe-get-xml-root
+                                                     haxe-@position-output))
+                                     'pos))))))
+             (if (battle-haxe-is-invalid-pos-string pos-string)
+                 (progn
+                   ;; (message
+                   ;;  (format
+                   ;;   "Couldn't find function position. Haxe returned this:\n%s"
+                   ;;   haxe-@position-output))
+                   nil)
+               (when-let* ((parts (battle-haxe-get-pos-string-parts pos-string))
+                           (filename (alist-get 'file parts))
+                           (line-str (alist-get 'line parts))
+                           (char-str (alist-get 'char parts))
+                           (line (string-to-number line-str))
+                           (char (string-to-number char-str)))
+                 (let* ((try-function-name (battle-haxe-get-regex-at-coordinates "\\([^( \t\n]*\\)" filename line char))
+                        (try-var-name (battle-haxe-get-regex-at-coordinates "\\([^: \t\n]*\\)" filename line char))
+                        (is-function? (< (length try-function-name) (length try-var-name)))
+                        (result-name)
+                        (result-xml-root)
+                        (haxe-point (battle-haxe-get-haxe-point-from-coordinates filename line char))
+                        (shell-cmd2 (battle-haxe-make-command-string haxe-point "type")))
+                   
+                   (async-start
+                    `(lambda ()
+                       (shell-command-to-string ,shell-cmd2))
+                    (lambda (haxe-@type-output)
+                      
+                      (setq result-name (if is-function?
+                                            try-function-name
+                                          try-var-name))
+                      (setq result-xml-root (battle-haxe-get-xml-root haxe-@type-output))
+                      
+                      ;; pass the final value:
+                      (funcall callback
+                               (list
+                                (cons 'name result-name)
+                                (cons 'xml-root result-xml-root)
+                                (cons 'is-function? is-function?)))))))))))
+        ;; Found something, and fetching data asynchronously.
+        ;; Return nil for now so eldoc doesn't launch yet.
+        nil))))
 
 (defun battle-haxe-get-regex-at-coordinates (regex filename line char)
   "Travel to the file FILENAME in a temporary buffer and extract some text.
 The function goes to LINE and CHAR coordinates and tries to match REGEX."
   (let ((temp-buffer-name "*Haxe-temp*"))
     (progn
-      (if (not (get-buffer temp-buffer-name))
-          (generate-new-buffer temp-buffer-name))
+      (unless (get-buffer temp-buffer-name)
+        (generate-new-buffer temp-buffer-name))
       (with-current-buffer
           temp-buffer-name
         (delete-region (point-min) (point-max))
@@ -924,8 +903,8 @@ All of the matched results are returned as a list."
     (goto-char 0)
     (re-search-forward regex nil t)
     (cl-map 'listp
-       (lambda (n) (match-string n))
-       (number-sequence 1 num-results))))
+            (lambda (n) (match-string n))
+            (number-sequence 1 num-results))))
 
 (defun battle-haxe-init ()
   "Set up the Haxe compiler services in the buffer.
@@ -989,10 +968,9 @@ Can be called interactively in another project to start a server there instead."
   
   (battle-haxe-save-buffer-silently)
   
-  (let*
-      ((response (battle-haxe-position-query (battle-haxe-get-haxe-point)))
-       (pos-string (car response))
-       (shell-result (cdr response)))
+  (let* ((response (battle-haxe-position-query (battle-haxe-get-haxe-point)))
+         (pos-string (car response))
+         (shell-result (cdr response)))
     (if (battle-haxe-is-invalid-pos-string pos-string)
         (message (format "Could not find definition. Haxe returned this:\n%s" shell-result))
       (battle-haxe-jump-to-pos-string (battle-haxe-get-pos-string-parts pos-string)))))
@@ -1000,24 +978,22 @@ Can be called interactively in another project to start a server there instead."
 (defun battle-haxe-position-query (haxe-point)
   "Ask server the original position of object at point HAXE-POINT.
 The return is a cons pair of (pos-string . shell-result)"
-  (let*
-      ((query (battle-haxe-make-command-string haxe-point "position"))
-       (shell-result (shell-command-to-string query))
-       (pos-string (nth 2 (car
-                           (xml-get-children
-                            (car (battle-haxe-get-xml-root shell-result))
-                            'pos)))))
-    (cons pos-string shell-result )))
+  (let* ((query (battle-haxe-make-command-string haxe-point "position"))
+         (shell-result (shell-command-to-string query))
+         (pos-string (nth 2 (car
+                             (xml-get-children
+                              (car (battle-haxe-get-xml-root shell-result))
+                              'pos)))))
+    (cons pos-string shell-result)))
 
 (defun battle-haxe-jump-to-pos-string (pos-string-parts)
   "Visit coordinates (file, line, char) returned by Haxe compiler services.
 POS-STRING-PARTS hold the coordinates.
 The function uses 'push-mark' to enable going back to the previous position."
-  (let*
-      ((parts pos-string-parts)
-       (filename (alist-get 'file parts))
-       (line (string-to-number (alist-get 'line parts)))
-       (char (string-to-number (alist-get 'char parts))))
+  (let* ((parts pos-string-parts)
+         (filename (alist-get 'file parts))
+         (line (string-to-number (alist-get 'line parts)))
+         (char (string-to-number (alist-get 'char parts))))
     (when filename
       (push-mark)
       (find-file filename)
@@ -1042,32 +1018,32 @@ Choosing between the results is done with helm."
            'pos))
          (is-valid source-list)
          (usages-list
-          (if is-valid
-              (xml-get-children
-               (car (battle-haxe-get-xml-root (shell-command-to-string command-to-call2)))
-               'pos)))
+          (when is-valid
+            (xml-get-children
+             (car (battle-haxe-get-xml-root (shell-command-to-string command-to-call2)))
+             'pos)))
          (candidates
-          (if is-valid
-              (-map
-               (lambda (node)
-                 (let* ((pos-string (nth 2 node))
-                        (parts (battle-haxe-get-pos-string-parts pos-string))
-                        (file (alist-get 'file parts))
-                        (formatted
-                         (format
-                          "%s:%s:%s"
-                          (propertize file
-                                      'face 'helm-grep-file)
-                          (propertize (alist-get 'line parts)
-                                      'face 'helm-grep-lineno)
-                          (propertize (battle-haxe-get-line-contents parts)
-                                      'face 'helm-grep-match)))
-                        (candidate
-                         (cons formatted parts)))
-                   candidate))
-               (append
-                source-list
-                usages-list)))))
+          (when is-valid
+            (-map
+             (lambda (node)
+               (let* ((pos-string (nth 2 node))
+                      (parts (battle-haxe-get-pos-string-parts pos-string))
+                      (file (alist-get 'file parts))
+                      (formatted
+                       (format
+                        "%s:%s:%s"
+                        (propertize file
+                                    'face 'helm-grep-file)
+                        (propertize (alist-get 'line parts)
+                                    'face 'helm-grep-lineno)
+                        (propertize (battle-haxe-get-line-contents parts)
+                                    'face 'helm-grep-match)))
+                      (candidate
+                       (cons formatted parts)))
+                 candidate))
+             (append
+              source-list
+              usages-list)))))
     (if candidates
         (helm :sources   `((name . "Sections")
                            (candidates . ,candidates)
@@ -1108,7 +1084,7 @@ Or insert regularly, but without any function arg list."
          (args-str-raw
           (and is-function
                (battle-haxe-string-regex-results (concat ""battle-haxe-symbol-chars"*\(\\(.*\\)\)") 1 candidate)))
-         (args-str (if args-str-raw (first args-str-raw) ""))
+         (args-str (or (first args-str-raw) ""))
          (args nil))
     ;; Arguments
     (when is-function
@@ -1136,8 +1112,6 @@ Or insert regularly, but without any function arg list."
                      (format "${%s}, " it))
                    args)))
     ;; Process template
-    (list
-     )
     (apply
      #'concat
      (append
