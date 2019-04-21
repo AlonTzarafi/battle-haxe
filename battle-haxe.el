@@ -5,7 +5,7 @@
 ;; Author: Alon Tzarafi  <alontzarafi@gmail.com>
 ;; URL: https://github.com/AlonTzarafi/battle-haxe
 ;; Version: 1.0
-;; Package-Requires: ((emacs "25") (company "0.9.9") (helm "3.0") (yasnippet "0.13.0") (async "1.9.3") (cl-lib "0.5") (dash "2.12.0") (dash-functional "1.2.0") (s "1.10.0") (f "0.19.0"))
+;; Package-Requires: ((emacs "25") (company "0.9.9") (helm "3.0") (async "1.9.3") (cl-lib "0.5") (dash "2.12.0") (dash-functional "1.2.0") (s "1.10.0") (f "0.19.0"))
 ;; Keywords: programming, languages, completion
 
 ;; battle-haxe is free software; you can redistribute it and/or modify it
@@ -38,8 +38,6 @@
 (require 'company)
 ;; For find references
 (require 'helm)
-;; For function call snippets
-(require 'yasnippet)
 ;; For non-blocking operations
 (require 'async)
 ;; For helper functions
@@ -52,6 +50,10 @@
 (require 'dash-functional)
 (require 's)
 (require 'f)
+
+;; Optional dependency for function call snippets
+(declare-function yas-expand-snippet "ext:yasnippet.el")
+
 
 (defvar battle-haxe-yasnippet-completion-expansion nil
   "When non-nil, battle-haxe will expand completions using yasnippet when available.")

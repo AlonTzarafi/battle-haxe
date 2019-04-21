@@ -34,7 +34,7 @@ The main quirk is that the system has to force automatic saving of the edited Ha
 
 * Installation
 - *First install the following packages which are required as dependencies:*
-  - ~company~, ~helm~, ~yasnippet~, ~async~, ~dash~, ~dash-functional~, ~f~, ~s~
+  - ~company~, ~helm~, ~async~, ~dash~, ~dash-functional~, ~f~, ~s~, and optionally, ~yasnippet~.
 - *Download this package and add it to your load path, for example:*
 #+begin_src elisp
 ;; Tell Emacs where your elisp library sits
@@ -58,7 +58,7 @@ The main quirk is that the system has to force automatic saving of the edited Ha
          ("<f4>" . #'battle-haxe-goto-definition)
          ("<f12>" . #'battle-haxe-helm-find-references))
   :custom
-  (battle-haxe-yasnippet-completion-expansion t "Keep this if you want yasnippet to expand completions.")
+  (battle-haxe-yasnippet-completion-expansion t "Keep this if you want yasnippet to expand completions when it's available.")
   (battle-haxe-immediate-completion nil "Toggle this if you want to immediately trigger completion when typing '.' and other relevant prefixes."))
 #+end_src
 - Customize this as you will.
