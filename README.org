@@ -52,9 +52,9 @@ The main quirk is that the system has to force automatic saving of the edited Ha
     "Haxe syntax highlighting mode. This is simply using js-mode for now."))
 
 (use-package battle-haxe
-  :hook (haxe-mode . battle-haxe-services-mode)
+  :hook (haxe-mode . battle-haxe-mode)
   :bind (("S-<f4>" . #'pop-global-mark) ;To get back after visiting a definition
-         :map battle-haxe-services-mode-map
+         :map battle-haxe-mode-map
          ("<f4>" . #'battle-haxe-goto-definition)
          ("<f12>" . #'battle-haxe-helm-find-references))
   :custom
@@ -72,7 +72,7 @@ but here is a template "some-project.hxml" to get you started for this use case:
 #+end_src
 
 * Notes
-- This package is intended to support only the latest and greatest Haxe compiler version (currently =4.0.0-rc.1=).
+- This package is intended to support only the latest and greatest Haxe compiler version (currently =4.0.0-rc.2=).
 - There is no haxe-specific syntax highlighting/indentation mode included.
   However the =js-mode= (that drives the =haxe-mode=) does a good enough job with most Haxe code that it's less urgent to create a specialized mode.
   The =use-package= block for defining a =haxe-mode= is useful for things such as =yasnippet= storing your snippets under a predictable "haxe-mode" folder.
