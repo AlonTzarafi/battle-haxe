@@ -112,8 +112,10 @@ Used to determine if a new call to Haxe compiler services is needed.")
   :keymap battle-haxe-mode-map
   ;;Init the minor mode
   (progn
-    ;; Setup company for Haxe, and start server if needed
-    (battle-haxe-init)
+    ;;Set up the Haxe compiler services for `company' in the buffer.
+    ;; This starts a global server. If you want to force restart, or start in another project, run ‘battle-haxe-start-server’.
+    (unless (battle-haxe-is-server-running)
+      (battle-haxe-start-server))
     
     ;; Setup eldoc for Haxe
     (set (make-local-variable 'eldoc-documentation-function)
@@ -905,14 +907,6 @@ All of the matched results are returned as a list."
     (cl-map 'listp
             (lambda (n) (match-string n))
             (number-sequence 1 num-results))))
-
-(defun battle-haxe-init ()
-  "Set up the Haxe compiler services in the buffer.
-Start the Haxe compiler in server mode in current project upon loading file.
-This will only start the server if no server is running.
-If you want to restart, or start in another project, use ‘battle-haxe-start-server’."
-  (unless (battle-haxe-is-server-running)
-    (battle-haxe-start-server)))
 
 (defun battle-haxe-is-server-running ()
   "Return non-nil if Haxe server is running."
