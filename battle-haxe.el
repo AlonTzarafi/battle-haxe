@@ -962,9 +962,8 @@ Can be called interactively in another project to start a server there instead."
   
   (battle-haxe-save-buffer-silently)
   
-  (let* ((response (battle-haxe-position-query (battle-haxe-get-haxe-point)))
-         (pos-string (car response))
-         (shell-result (cdr response)))
+  (-let* ((response (battle-haxe-position-query (battle-haxe-get-haxe-point)))
+          ((pos-string . shell-result) response))
     (if (battle-haxe-is-invalid-pos-string pos-string)
         (message (format "Could not find definition. Haxe returned this:\n%s" shell-result))
       (battle-haxe-jump-to-pos-string (battle-haxe-get-pos-string-parts pos-string)))))
