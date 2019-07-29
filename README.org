@@ -23,23 +23,30 @@ The main quirk is that the system has to force automatic saving of the edited Ha
 * Big issue
 - Before a compiler services action is called, the document is always automatically saved without question.
   This is because the Haxe compiler doesn't accept compiler services calls when using other (temporary) files, so for now I had Haxe process the real file path instead and had the document forcibly saved.
-  This is not an issue for me at all, but if it is for you, don't use the package!
+  This is not an issue for me at all (I spam SAVE in all programs anyway), but if it is for you, don't use the package!
 
 * Issues
 - You MUST have a file with .hxml extension in the root project folder. (https://haxe.org/manual/compiler-usage-hxml.html)
   You must have it for the compiler to know what to check and which libraries you depend on.
   This file however does not exist in frameworks that compile your project differently (For example [[https://github.com/AlonTzarafi/battle-haxe#limeopenfl-projects][Lime/OpenFL projects]], see that section for a solution).
 - This package doesn't handle multiple simultaneous projects or running multiple Haxe completion servers yet.
-  If you want to switch to another project, run the ~battle-haxe-start-server~ command in the new project.
+  If you want to switch to another project, run the ~battle-haxe-start-server~ command in the new project to restart the server there.
 
 * Installation
-- *First install the following packages which are required as dependencies:*
-  - ~company~, ~helm~, ~async~, ~dash~, ~dash-functional~, ~f~, ~s~, and optionally, ~yasnippet~.
-- *Download this package and add it to your load path, for example:*
-#+begin_src elisp
-;; Tell Emacs where your elisp library sits
-(add-to-list 'load-path "~/.emacs.d/lisp/battle-haxe")
-#+end_src
+** Getting battle-haxe:
+- *With [[https://melpa.org/][MELPA]]:*
+  #+begin_src elisp
+  M-x install-package "battle-haxe"
+  #+end_src
+-  *Without [[https://melpa.org/][MELPA]] (manual installation):*
+  - First install the following packages which are required as dependencies:
+    - ~company~, ~helm~, ~async~, ~dash~, ~dash-functional~, ~f~, ~s~, and optionally, ~yasnippet~.
+  - Git-clone this package and add it to your load path, for example:
+    #+begin_src elisp
+    ;; Tell Emacs where your elisp library sits
+    (add-to-list 'load-path "~/.emacs.d/lisp/battle-haxe")
+    #+end_src
+** Using battle-haxe:
 - *If you have [[https://github.com/jwiegley/use-package][use-package]], this is a template you can insert to your init file to load the package:*
 #+begin_src elisp
 ;; This isn't really a package, it just provides a `haxe-mode' to work with
@@ -62,6 +69,8 @@ The main quirk is that the system has to force automatic saving of the edited Ha
   (battle-haxe-immediate-completion nil "Toggle this if you want to immediately trigger completion when typing '.' and other relevant prefixes."))
 #+end_src
 - Customize this as you will.
+- Ensure you have a correct ".hxml" file in project root.
+- Open a ".hx" file and you should have completion available in company-mode.
 * Lime/OpenFL projects
 The package uses the Haxe compiler directly and doesn't use Lime's "Project.xml" config file,\\
 but here is a template "some-project.hxml" to get you started for this use case:
@@ -72,10 +81,11 @@ but here is a template "some-project.hxml" to get you started for this use case:
 #+end_src
 
 * Notes
-- This package is intended to support only the latest and greatest Haxe compiler version (currently =4.0.0-rc.2=).
+- This package is intended to support only the latest and greatest Haxe compiler version (currently =4.0.0-rc.3=).
 - There is no haxe-specific syntax highlighting/indentation mode included.
-  However the =js-mode= (that drives the =haxe-mode=) does a good enough job with most Haxe code that it's less urgent to create a specialized mode.
-  The =use-package= block for defining a =haxe-mode= is useful for things such as =yasnippet= storing your snippets under a predictable "haxe-mode" folder.
+  However the =js-mode= (that drives the =haxe-mode=) does a good job with most Haxe code that it's less urgent to create a specialized mode.
+  However, Using "js-mode" directly for Haxe documents would be confusing.
+  That's why I include the =use-package= block for defining a =haxe-mode=. It's also useful for interacting with other packages - such as =yasnippet= storing your snippets under a predictable "haxe-mode" folder.
 
 * Package naming
 I just found it funny that the language's creator gave it the name "Haxe" but pronounces it as "Axe".
