@@ -383,13 +383,15 @@ The Haxe compiler services is then called to indentify the class."
 for starting a server based on the current buffer file's directory"
   (let ((dir (file-name-directory (or buffer-file-name "")))
         (candidates nil))
-    (while (and dir (not (f-root-p dir)))
-      (unless (file-remote-p dir)
-        (setq candidates
-              (append
-               candidates
-               (f-files dir (lambda (filename)
-                              (string-match-p "\\.hxml$" filename))))))
+    (while (and
+            dir
+            (not (f-root-p dir))
+            (not (file-remote-p dir)))
+      (setq candidates
+            (append
+             candidates
+             (f-files dir (lambda (filename)
+                            (string-match-p "\\.hxml$" filename)))))
       (setq dir (f-parent dir)))
     
     (setq candidates (reverse candidates))
