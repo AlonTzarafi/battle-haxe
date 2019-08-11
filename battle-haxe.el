@@ -411,7 +411,9 @@ for starting a server based on the current buffer file's directory"
   (append
    (list
     "--cwd" battle-haxe-cwd)
-   battle-haxe-cached-hxml-args))
+   (-map
+    (lambda (str) (concat "\"" str "\""))
+    battle-haxe-cached-hxml-args)))
 
 (defun battle-haxe-make-command-string (haxe-point compiler-services-mode)
   "Construct a shell command for calling compiler services on the Haxe server.
