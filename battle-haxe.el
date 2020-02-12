@@ -25,11 +25,12 @@
 
 ;; This package offers a development system for the Haxe programming language.
 ;; Haxe code completion is activated using the `company-mode' package.
-;; Options like "go to definition" and "find all references" are available, as well as `eldoc' support.
+;; Code navigation options like "go to definition" and "find all references" are available.
+;; There is support for `eldoc' to show the type of current variable, the arguments of current function.
 ;; All of those features are triggered in `battle-haxe-mode' which also spawns a Haxe server to perform them.
 ;; The tools rely on the Haxe "compiler services" feature ( https://haxe.org/manual/cr-completion-overview.html ).
-;; The main quirk is that the system has to force automatic saving of the edited Haxe buffer.
-;; If this is a problem for you don't use the package.
+;; The main quirk is that the system has to force automatic saving of the Haxe code file buffer as you edit it.
+;; If this is a problem for you, don't use the package.
 ;; See the project home page for more information.
 
 ;;; Code:
@@ -59,7 +60,7 @@
   "When non-nil, battle-haxe will expand completions using yasnippet when available.")
 
 (defvar battle-haxe-immediate-completion t
-  "When non-nil, battle-haxe will immediately start completions in some cases.
+  "When non-nil, battle-haxe can immediately trigger code-completion on its own.
 Otherwise, completion only ever starts as configured in `company-mode' settings.
 Example cases for immediate completions (the '|' symbol is the current point):
 new |
@@ -68,10 +69,10 @@ myObject.|
 var x:|")
 
 (defvar battle-haxe-disallow-other-backends-in-strings-and-comments nil
-  "Allow other backends in strings and comments.")
+  "Allow other `company-mode' backends in strings and comments.")
 
 (defvar battle-haxe-cwd nil
-  "Current working directory, or current project folder to pass to Haxe.")
+  "Current working directory: Current project folder to pass to Haxe compiler.")
 
 (defvar battle-haxe-cached-hxml-args ""
   "Holds the Haxe compiler parameters, extracted from the '.hxml' file.
@@ -88,7 +89,7 @@ They are sent to the compiler to call compiler services for this project.")
 Used to determine if a new call to Haxe compiler services is needed.")
 
 (defvar-local battle-haxe-cached-completion-response nil
-  "Buffer-local saved copy of last company completion server response.")
+  "Buffer-local saved copy of last completion server response.")
 
 (defvar-local battle-haxe-current-completions-node-processor #'battle-haxe-type-completion-general-node-processor
   "Buffer-local current node-processor function.")
@@ -135,9 +136,9 @@ Used to determine if a new call to Haxe compiler services is needed.")
          (let ((prefix (battle-haxe-get-company-prefix)))
            (or (when (looking-back
                       (concat
+                       ;; Only when these conditions are found, immediate compilation can trigger.
                        "\\(?:"battle-haxe-non-symbol-chars"\\(using \\|import \\|new \\)""\\|[.:<]\\)")
                       (- (point) (line-beginning-position)))
-                 ;; Only when these options are found, immediate compilation can trigger.
                  (when battle-haxe-immediate-completion
                    (cons prefix t)))
                prefix))
@@ -396,12 +397,12 @@ for starting a server based on the current buffer file's directory"
     
     (setq candidates (reverse candidates))
     
-    ;; Another idea: use project root as a candidate (if have projectile available)
+    ;; Future idea: use projectile project root as a primary candidate (only if have projectile loaded)
     
     candidates))
 
 (defun battle-haxe-read-lines (file-path)
-  "Return a list of lines of a file at FILE-PATH."
+  "Return a list of the lines of a file at FILE-PATH."
   (with-temp-buffer
     (insert-file-contents file-path)
     (split-string (buffer-string) "\n" t)))
@@ -430,8 +431,7 @@ the COMPILER-SERVICES-MODE is appended to the haxe-point in the --display argume
     (list
      "--display"
      (concat
-      haxe-point
-      (concat "@" compiler-services-mode))))))
+      haxe-point "@" compiler-services-mode)))))
 
 (defun battle-haxe-get-xml-root (xml-string)
   "Get a root XML object from the provided XML-STRING.
@@ -619,9 +619,9 @@ Optionally provide a DEFAULT-VALUE if not found."
              ""
              (battle-haxe-get-prop name 'docstring "No documentation provided\n")))
            
-           ;; Give extra character to buffer because popup window crops up my text :-/
-           ;; Take note: the following string isn't empty,
-           "⁣"                            ; <-- there is a unicode "INVISIBLE SEPARATOR" here
+           ;; ;; Give extra character to buffer because popup window crops up my text :-/
+           ;; ;; Take note: the following string isn't empty,
+           ;; "⁣"                            ; <-- there is a unicode "INVISIBLE SEPARATOR" here
            ))))
     ;; (with-current-buffer doc-buffer
     ;;   (visual-line-mode))
@@ -667,7 +667,7 @@ The colon is accepted as a prefix to a Haxe type (and completion can trigger)."
     inserted-member))
 
 (defun battle-haxe-get-prefix-any-symbol ()
-  "Return a typed Haxe symbol, or nil if not detected to be typing."
+  "Return a currently typed Haxe symbol, or nil if not detected to be typing any."
   (let ((inserted-symbol
          (save-excursion
            (when (re-search-backward
@@ -691,7 +691,7 @@ If no function call found, return current point."
                   t)
                  (when (re-search-backward
                         (concat "\\("battle-haxe-symbol-chars"\\)[[:space:]]*[(][^(]*\\=")
-                        ;;TODO: Allow detection of multi-line function calls. Maybe use (backward-up-list) until hit a "("
+                        ;;TODO: Allow detection of multi-line function calls. Maybe use `backward-up-list' until hit a "("
                         (line-beginning-position)
                         t)
                    (match-beginning 1))))))
@@ -744,12 +744,11 @@ If nothing found to fetch type information to, do nothing."
              (eldoc-message
               (if is-function?
                   (concat name args " : " return-val)
-                (concat
-                 name " : " signature))))))))))
+                (concat name " : " signature))))))))))
 
 (defun battle-haxe-first-real-line-of (str)
   "Get the first non-empty line in STR."
-  (first (-remove #'string-empty-p (split-string str "\n"))))
+  (cl-first (-remove #'string-empty-p (split-string str "\n"))))
 
 (defun battle-haxe-get-pos-string-parts (pos-string)
   "Split the returned POS-STRING to an alist with it's components.
@@ -779,7 +778,7 @@ and the 'return-val will be the full signature."
               (progn
                 (goto-char (scan-sexps (point) 1))
                 (let* ((args (substring (buffer-string) 0 (- (point) 1)))
-                       (return-val (first
+                       (return-val (cl-first
                                     (battle-haxe-string-regex-results
                                      "-> \\(.*\\)"
                                      1
@@ -929,7 +928,7 @@ Can be called interactively in another project to start a server there instead."
     (setq battle-haxe-server-process nil))
   
   (when-let ((hxml-path
-              (first
+              (cl-first
                (battle-haxe-resolve-hxml-candidates))))
     ;;TODO: Make project-specific vars not global and allow launching several compilation servers, one per project?
     (setq battle-haxe-cached-hxml-args
@@ -1076,12 +1075,12 @@ Or insert regularly, but without any function arg list."
 
 (defun battle-haxe-split-candidate (candidate)
   "Split CANDIDATE to a name, and a list of arguments (if any)."
-  (let* ((name (first (battle-haxe-string-regex-results (concat "\\("battle-haxe-symbol-chars"*\\).*") 1 candidate)))
+  (let* ((name (cl-first (battle-haxe-string-regex-results (concat "\\("battle-haxe-symbol-chars"*\\).*") 1 candidate)))
          (is-function (cl-search "(" candidate))
          (args-str-raw
           (and is-function
                (battle-haxe-string-regex-results (concat ""battle-haxe-symbol-chars"*\(\\(.*\\)\)") 1 candidate)))
-         (args-str (or (first args-str-raw) ""))
+         (args-str (or (cl-first args-str-raw) ""))
          (args nil))
     ;; Arguments
     (when is-function
