@@ -213,9 +213,14 @@ Sends PREFIX to the function `battle-haxe-compute-candidates'"
                            (string= rest-hash (alist-get 'rest-hash current))
                            ;; ensure the saved line is in scope
                            (>= (- (point) (line-beginning-position)) (length line-str))
-                           ;; same initial part of line
-                           (eq 0 (cl-search line-str (alist-get 'line-str current))))))))
-      
+                           
+                           ;;---OLD:
+                           ;; ;; same initial part of line
+                           ;; (eq 0 (cl-search line-str (alist-get 'line-str current)))
+                           
+                           ;;---NEW:
+                           ;; same exact line
+                           (string=  line-str (alist-get 'line-str current)))))))
       (if use-cached
           ;; Approve a previous cached data
           (unless (alist-get 'approved battle-haxe-cached-completion-context)
