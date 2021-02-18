@@ -40,7 +40,7 @@ The main quirk is that the system has to force automatic saving of the edited Ha
   #+end_src
 -  *Without [[https://melpa.org/][MELPA]] (manual installation):*
   - First install the following packages which are required as dependencies:
-    - ~company~, ~helm~, ~async~, ~dash~, ~dash-functional~, ~f~, ~s~, and optionally, ~yasnippet~.
+    - ~company~, ~helm~, ~async~, ~dash~, ~f~, ~s~, and optionally, ~yasnippet~.
   - Git-clone this package and add it to your load path, for example:
     #+begin_src elisp
     ;; Tell Emacs where your elisp library sits
