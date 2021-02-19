@@ -5,7 +5,7 @@
 ;; Author: Alon Tzarafi  <alontzarafi@gmail.com>
 ;; URL: https://github.com/AlonTzarafi/battle-haxe
 ;; Version: 1.0
-;; Package-Requires: ((emacs "25") (company "0.9.9") (helm "3.0") (async "1.9.3") (cl-lib "0.5") (dash "2.12.0") (dash-functional "1.2.0") (s "1.10.0") (f "0.19.0"))
+;; Package-Requires: ((emacs "25") (company "0.9.9") (helm "3.0") (async "1.9.3") (cl-lib "0.5") (dash "2.18.0") (s "1.10.0") (f "0.19.0"))
 ;; Keywords: programming, languages, completion
 
 ;; battle-haxe is free software; you can redistribute it and/or modify it
@@ -48,7 +48,6 @@
 (require 'xml)
 ;; -- (downloaded)
 (require 'dash)
-(require 'dash-functional)
 (require 's)
 (require 'f)
 
@@ -274,7 +273,7 @@ If a cache is valid, return it right away, else return async candidates."
   (let ((process-result
          (lambda (xml-str)
            ;; When it will get server results:
-           (-filter (-not #'string-empty-p)
+           (-remove #'string-empty-p
                     (battle-haxe-parse-completions-from-xml xml-str inserted-text))))
         (use-cached (alist-get 'approved battle-haxe-cached-completion-context)))
     (if use-cached
