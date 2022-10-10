@@ -78,6 +78,7 @@ but here is a template "some-project.hxml" to get you started for this use case:
 -cp src
 -lib lime
 -lib openfl
+-js example.js
 #+end_src
 
 * Notes
